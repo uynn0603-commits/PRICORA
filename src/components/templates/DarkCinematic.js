@@ -8,7 +8,7 @@ import { albumMeta, downloadAllButton } from "../gallery/GalleryHeader.js";
 import { coverImage } from "../gallery/GalleryHero.js";
 import { pad } from "../gallery/model.js";
 import { icon } from "../icons.js";
-import { logoLockup } from "../logo.js";
+import { studioLockup } from "../logo.js";
 
 const GOLD = "text-[#C8A96A]";
 const MUTED = "text-[#A1A1A1]";
@@ -42,7 +42,7 @@ export function render(model, { banner = "" } = {}) {
       ${banner}
       <header id="cine-header" class="sticky top-0 z-30 -mb-16 border-b border-transparent transition-colors duration-500">
         <div class="mx-auto grid h-16 max-w-[1600px] grid-cols-[auto_1fr_auto] items-center gap-4 px-5 md:px-12">
-          <a href="#" data-scroll="top" aria-label="Lên đầu trang">${logoLockup({ size: 20, compact: true, mono: true, tone: "dark" })}</a>
+          <a href="#" data-scroll="top" aria-label="Lên đầu trang">${studioLockup(model.studio, { size: 20, compact: true, mono: true, tone: "dark" })}</a>
           <p class="hidden truncate text-center text-[11px] uppercase tracking-[0.34em] text-white/75 md:block">${esc(model.title)}</p>
           <span class="md:hidden"></span>
           ${downloadAllButton(model, { className: goldButton, label: "Tải về", short: "Tải về", iconClass: "h-3.5 w-3.5" })}
@@ -86,7 +86,7 @@ export function render(model, { banner = "" } = {}) {
         <p class="mt-4 text-[11px] uppercase tracking-[0.3em] ${MUTED}">${esc(model.customerName)} · ${esc(meta.year)}</p>
         <div class="mt-10 flex justify-center">${downloadAllButton(model, { className: `${goldButton} h-12 px-7`, label: "Tải cả album", short: "Tải cả album" })}</div>
       </section>
-      ${galleryFooter({ tone: "dark" })}
+      ${galleryFooter({ tone: "dark", studio: model.studio })}
     </div>`;
 }
 

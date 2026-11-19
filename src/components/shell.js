@@ -1,10 +1,11 @@
 import {
   clearSession,
   getSession,
-  getSettings,
   markAllNotificationsRead,
   markNotificationRead,
   getNotifications,
+  studiosForUser,
+  switchStudio,
 } from "../data/store.js";
 import { navigate } from "../utils/router.js";
 import { onCleanup } from "../utils/lifecycle.js";
@@ -79,11 +80,32 @@ export function bindShell() {
     navigate(`${location.pathname}${location.search}`, { replace: true, keepScroll: true });
   });
 
+  document.getElementById("studio-switch")?.addEventListener("click", (event) => {
+    const session = getSession();
+    if (!session) return;
+    const items = studiosForUser(session.user.id)
+      .filter((item) => item.studio.id !== session.studioId)
+      .map((item) => ({
+        label: item.studio.status === "active" ? item.studio.name : `${item.studio.name} (tạm khóa)`,
+        icon: "building-2",
+        onClick: () => {
+          if (item.studio.status !== "active") {
+            toast(`${item.studio.name} đang bị tạm khóa`, "error");
+            return;
+          }
+          switchStudio(item.studio.id);
+          toast(`Đã chuyển sang ${item.studio.name}`);
+          navigate("/admin");
+        },
+      }));
+    if (session.user.platformAdmin) items.push({ label: "Quản trị nền tảng", icon: "shield-check", onClick: () => navigate("/platform") });
+    if (items.length) openMenu(event.currentTarget, items);
+  });
+
   document.getElementById("avatar-btn")?.addEventListener("click", (event) => {
     const session = getSession();
-    const settings = getSettings();
     openMenu(event.currentTarget, [
-      { label: session?.name || settings.accountName, icon: "user-round", onClick: () => navigate("/admin/settings?tab=account") },
+      { label: session?.name || "Tài khoản", icon: "user-round", onClick: () => navigate("/admin/settings?tab=account") },
       { label: "Cài đặt", icon: "settings", onClick: () => navigate("/admin/settings") },
       {
         label: "Đăng xuất",

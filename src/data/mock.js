@@ -10,6 +10,8 @@ export const SEED_TEMPLATES = {
   alb_tuan_anh: "editorial-magazine",
   alb_mai_phuong: "masonry-gallery",
   alb_thanh_tung: "masonry-gallery",
+  alb_lm_an_khang: "wedding-luxury",
+  alb_lm_hai_yen: "dark-cinematic",
 };
 
 export const PICORA_DEFAULTS = {
@@ -74,11 +76,26 @@ export function buildPhotos(pool, count, createdAt, salt) {
   });
 }
 
+export const SEED_STUDIO_ID = "std_minhkhoa";
+
+export function studioSettings(overrides = {}) {
+  return {
+    defaultExpirationDays: 90,
+    defaultPasswordProtection: false,
+    slogan: PICORA_DEFAULTS.slogan,
+    primaryColor: "#7552F6",
+    secondaryColor: "#C94DEB",
+    logoDataUrl: "",
+    ...overrides,
+  };
+}
+
 function makeAlbum(config) {
   const created = monthDate(config.month, config.day);
   const photos = buildPhotos(config.pool, config.count, created, config.salt);
   return {
     id: config.id,
+    studioId: config.studioId || SEED_STUDIO_ID,
     slug: config.slug,
     name: config.name,
     customerName: config.customerName,
@@ -110,25 +127,78 @@ export function createSeed() {
   const portrait = men.concat(cameras);
   const event = events.concat(graduation.slice(4, 6));
 
+  const now = new Date().toISOString();
   return {
-    version: 2,
-    credentials: {
-      email: "admin@view.vn",
-      password: "123456",
-    },
+    version: 3,
+    users: [
+      { id: "usr_khoa", name: "Nguyễn Minh Khoa", email: "khoa@minhkhoa.studio", password: "123456" },
+      { id: "usr_thuha", name: "Trần Thu Hà", email: "thuha@minhkhoa.studio", password: "123456" },
+      { id: "usr_lan", name: "Lê Ngọc Lan", email: "lan@lumiere.vn", password: "123456" },
+      { id: "usr_platform", name: "Quản trị PICORA", email: "admin@picora.vn", password: "123456", platformAdmin: true },
+    ],
+    studios: [
+      {
+        id: SEED_STUDIO_ID,
+        slug: "minh-khoa-studio",
+        name: "Minh Khoa Studio",
+        planId: "free",
+        status: "active",
+        createdAt: monthDate(-8, 2).toISOString(),
+        settings: studioSettings(),
+      },
+      {
+        id: "std_lumiere",
+        slug: "lumiere-wedding",
+        name: "Lumière Wedding",
+        planId: "pro",
+        status: "active",
+        createdAt: monthDate(-3, 10).toISOString(),
+        settings: studioSettings({ primaryColor: "#B4685A", secondaryColor: "#D9A441", slogan: "Lưu giữ ngày trọng đại." }),
+      },
+    ],
+    memberships: [
+      { userId: "usr_khoa", studioId: SEED_STUDIO_ID, role: "owner", createdAt: now },
+      { userId: "usr_thuha", studioId: SEED_STUDIO_ID, role: "staff", createdAt: now },
+      { userId: "usr_lan", studioId: "std_lumiere", role: "owner", createdAt: now },
+    ],
     notificationsRead: [],
-    settings: {
-      platformName: PICORA_DEFAULTS.platformName,
-      defaultExpirationDays: 90,
-      defaultPasswordProtection: false,
-      slogan: PICORA_DEFAULTS.slogan,
-      primaryColor: "#7552F6",
-      secondaryColor: "#C94DEB",
-      logoDataUrl: "",
-      accountName: "Nguyễn Minh Khoa",
-      email: "admin@view.vn",
-    },
     albums: [
+      makeAlbum({
+        id: "alb_lm_an_khang",
+        studioId: "std_lumiere",
+        slug: "an-khang-bao-ngoc",
+        name: "An Khang & Bảo Ngọc",
+        customerName: "An Khang & Bảo Ngọc",
+        customerPhone: "0937 204 118",
+        occasion: "Wedding",
+        description: "Lễ gia tiên buổi sáng ở Huế, áo dài đỏ và mâm quả truyền thống.",
+        month: -1,
+        day: 6,
+        expiresAt: daysFromToday(60),
+        status: "published",
+        count: 64,
+        pool: rotate(wedding, 3).concat(weddingExtra),
+        salt: 11,
+        password: "",
+      }),
+      makeAlbum({
+        id: "alb_lm_hai_yen",
+        studioId: "std_lumiere",
+        slug: "hai-yen-pre-wedding",
+        name: "Hải Yến — Pre-wedding Hội An",
+        customerName: "Hải Yến & Minh Đức",
+        customerPhone: "0905 310 926",
+        occasion: "Pre-wedding",
+        description: "Phố cổ lúc chạng vạng, đèn lồng và những con hẻm vàng.",
+        month: 0,
+        day: 2,
+        expiresAt: daysFromToday(30),
+        status: "published",
+        count: 48,
+        pool: rotate(moody, 2).concat(outdoor),
+        salt: 12,
+        password: "",
+      }),
       makeAlbum({
         id: "alb_minh_anh",
         slug: "minh-anh-hoang-nam",

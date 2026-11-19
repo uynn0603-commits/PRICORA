@@ -45,10 +45,22 @@ import {
   Monitor,
   Smartphone,
   Sparkles,
+  Ban,
+  Building2,
+  ChevronsUpDown,
+  CreditCard,
+  ShieldCheck,
+  Users,
   createElement,
 } from "lucide";
 
 const registry = {
+  Ban,
+  Building2,
+  ChevronsUpDown,
+  CreditCard,
+  ShieldCheck,
+  Users,
   ArrowDown,
   ArrowRight,
   Expand,

@@ -7,7 +7,7 @@ import { frame } from "../gallery/GalleryGrid.js";
 import { albumMeta, downloadAllButton } from "../gallery/GalleryHeader.js";
 import { coverImage } from "../gallery/GalleryHero.js";
 import { icon } from "../icons.js";
-import { logoLockup } from "../logo.js";
+import { studioLockup } from "../logo.js";
 
 const BATCH = 24;
 
@@ -35,7 +35,7 @@ export function render(model, { banner = "" } = {}) {
       ${banner}
       <header class="sticky top-0 z-30 border-b border-[#E8EAED] bg-white/95 backdrop-blur">
         <div class="mx-auto flex h-16 max-w-[1600px] items-center gap-4 px-4 md:px-8">
-          <a href="#" data-scroll="top" class="shrink-0" aria-label="Lên đầu trang">${logoLockup({ size: 28, compact: true })}</a>
+          <a href="#" data-scroll="top" class="shrink-0" aria-label="Lên đầu trang">${studioLockup(model.studio, { size: 28, compact: true })}</a>
           <span class="hidden h-6 w-px bg-[#E8EAED] sm:block"></span>
           <div class="hidden min-w-0 flex-1 sm:block">
             <p class="truncate text-sm font-semibold">${esc(model.title)}</p>
@@ -71,7 +71,7 @@ export function render(model, { banner = "" } = {}) {
             : `<div class="rounded-2xl border border-dashed border-[#E8EAED] py-20 text-center text-sm text-[#5F6368]">Ảnh sẽ sớm xuất hiện tại đây.</div>`
         }
       </section>
-      ${galleryFooter({ tone: "light" })}
+      ${galleryFooter({ tone: "light", studio: model.studio })}
     </div>`;
 }
 

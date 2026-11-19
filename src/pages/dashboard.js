@@ -1,4 +1,4 @@
-import { getAlbums, getExpiring, getMonthlyStats, getOverview, getSettings } from "../data/store.js";
+import { getAlbums, getExpiring, getMonthlyStats, getOverview, getSession } from "../data/store.js";
 import { coverSrc } from "../data/media.js";
 import { statusBadge } from "../components/badge.js";
 import { barChart } from "../components/chart.js";
@@ -19,7 +19,7 @@ export const dashboardPage = {
     return "Tổng quan · PICORA";
   },
   render() {
-    const settings = getSettings();
+    const userName = getSession()?.name || "";
     const overview = getOverview();
     const months = getMonthlyStats(8);
     const recent = getAlbums().slice(0, 4);
@@ -59,7 +59,7 @@ export const dashboardPage = {
       <section class="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p class="text-sm text-mist">${esc(today)}</p>
-          <h1 class="mt-1 text-[28px] font-semibold tracking-tight md:text-[32px]">${esc(greeting(settings.accountName))}</h1>
+          <h1 class="mt-1 text-[28px] font-semibold tracking-tight md:text-[32px]">${esc(greeting(userName))}</h1>
         </div>
         <a data-link href="/admin/albums/new" class="${ui.primary}">${icon("plus", "h-4 w-4")} Tạo album</a>
       </section>

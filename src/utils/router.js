@@ -35,6 +35,8 @@ export function matchRoute(pathname) {
   const routes = [
     { name: "login", re: /^\/$/ },
     { name: "login", re: /^\/login\/?$/ },
+    { name: "signup", re: /^\/signup\/?$/ },
+    { name: "platform", re: /^\/platform\/?$/ },
     { name: "dashboard", re: /^\/admin\/?$/ },
     { name: "album-form", re: /^\/admin\/albums\/new\/?$/ },
     { name: "album-form", re: /^\/admin\/albums\/([^/]+)\/edit\/?$/ },
@@ -45,7 +47,8 @@ export function matchRoute(pathname) {
     { name: "albums", re: /^\/admin\/albums\/?$/ },
     { name: "storage", re: /^\/admin\/storage\/?$/ },
     { name: "settings", re: /^\/admin\/settings\/?$/ },
-    { name: "gallery", re: /^\/gallery\/([^/]+)\/?$/ },
+    { name: "gallery", re: /^\/s\/([^/]+)\/([^/]+)\/?$/ },
+    { name: "legacy-gallery", re: /^\/gallery\/([^/]+)\/?$/ },
   ];
 
   for (const route of routes) {

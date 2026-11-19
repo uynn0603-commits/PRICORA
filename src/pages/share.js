@@ -4,7 +4,7 @@ import { pageHeader } from "../components/fields.js";
 import { icon } from "../components/icons.js";
 import { statusBadge, statusLabel } from "../components/badge.js";
 import { toast } from "../components/toast.js";
-import { albumUrl, effectiveStatus, extendExpiration, getAlbum, updateAlbum } from "../data/store.js";
+import { albumUrl, effectiveStatus, extendExpiration, galleryPath, getAlbum, updateAlbum } from "../data/store.js";
 import { copyText } from "../utils/clipboard.js";
 import { daysUntil, esc, expiryPhrase, formatDate } from "../utils/format.js";
 import { navigate } from "../utils/router.js";
@@ -34,7 +34,7 @@ export const sharePage = {
       ${pageHeader({
         title: "Chia sẻ album",
         description: album.name,
-        actions: `<a data-link href="/gallery/${album.slug}" class="${ui.secondary}">${icon("eye", "h-4 w-4")} Mở album</a>`,
+        actions: `<a data-link href="${galleryPath(album)}" class="${ui.secondary}">${icon("eye", "h-4 w-4")} Mở album</a>`,
       })}
       ${
         published

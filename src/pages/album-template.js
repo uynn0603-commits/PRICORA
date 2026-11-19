@@ -5,7 +5,7 @@ import { bindTemplateSelector, templateSelector } from "../components/template-s
 import { getTemplateMeta } from "../components/templates/index.js";
 import { toast } from "../components/toast.js";
 import { photoSrc } from "../data/media.js";
-import { getAlbum, setAlbumTemplate } from "../data/store.js";
+import { galleryPath, getAlbum, setAlbumTemplate } from "../data/store.js";
 import { esc } from "../utils/format.js";
 import { navigate } from "../utils/router.js";
 import { ui } from "../utils/ui.js";
@@ -16,7 +16,7 @@ let choice = null;
 // for each template stands in.
 export function previewSrc(album, templateId) {
   const hasPhotos = album?.photos.some((photo) => photoSrc(photo));
-  return hasPhotos ? `/gallery/${album.slug}?template=${templateId}&embed=1` : `/templates/${templateId}/demo?embed=1`;
+  return hasPhotos ? `${galleryPath(album)}?template=${templateId}&embed=1` : `/templates/${templateId}/demo?embed=1`;
 }
 
 function footerBar(album) {
@@ -43,7 +43,7 @@ export const albumTemplatePage = {
       ${pageHeader({
         title: "Đổi giao diện",
         description: `${album.name} · Chỉ thay đổi cách trình bày album.`,
-        actions: `<a data-link href="/gallery/${album.slug}" class="${ui.secondary}">${icon("eye", "h-4 w-4")} Mở album</a>`,
+        actions: `<a data-link href="${galleryPath(album)}" class="${ui.secondary}">${icon("eye", "h-4 w-4")} Mở album</a>`,
       })}
       <div id="template-picker">${templateSelector({ selected: choice, current: album.templateId, selectLabel: "Dùng giao diện này" })}</div>
       <div id="template-bar" class="sticky bottom-0 z-10 -mx-4 mt-6 flex flex-col gap-3 border-t border-line bg-white/95 px-4 py-3 backdrop-blur sm:flex-row sm:items-center md:-mx-8 md:px-8">${footerBar(album)}</div>`;

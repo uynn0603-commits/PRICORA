@@ -6,7 +6,7 @@ import { frame } from "../gallery/GalleryGrid.js";
 import { albumMeta, downloadAllButton } from "../gallery/GalleryHeader.js";
 import { coverImage } from "../gallery/GalleryHero.js";
 import { splitCouple } from "../gallery/model.js";
-import { logoLockup } from "../logo.js";
+import { studioLockup } from "../logo.js";
 
 const INK = "text-[#29251F]";
 const ACCENT = "text-[#B99A72]";
@@ -71,7 +71,7 @@ export function render(model, { banner = "" } = {}) {
       ${banner}
       <header class="sticky top-0 z-30 border-b border-[#EAE5DC] bg-[#FAF9F6]/95 backdrop-blur">
         <div class="mx-auto grid h-16 max-w-[1500px] grid-cols-[auto_1fr_auto] items-center gap-4 px-4 md:grid-cols-[1fr_auto_1fr] md:px-10">
-          <a href="#" data-scroll="top" class="opacity-80 transition hover:opacity-100" aria-label="Lên đầu trang">${logoLockup({ size: 20, compact: true, mono: true })}</a>
+          <a href="#" data-scroll="top" class="opacity-80 transition hover:opacity-100" aria-label="Lên đầu trang">${studioLockup(model.studio, { size: 20, compact: true, mono: true })}</a>
           <p class="truncate text-center font-playfair text-[15px] italic md:text-base">${esc(model.title)}</p>
           <nav class="flex items-center justify-end gap-6">
             <a href="#gallery" data-scroll="gallery" class="hidden text-[12px] uppercase tracking-[0.16em] text-[#29251F]/70 transition hover:text-[#B99A72] sm:inline">Bộ ảnh</a>
@@ -109,7 +109,7 @@ export function render(model, { banner = "" } = {}) {
             </section>`
           : ""
       }
-      ${galleryFooter({ tone: "ivory" })}
+      ${galleryFooter({ tone: "ivory", studio: model.studio })}
     </div>`;
 }
 

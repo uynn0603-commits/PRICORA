@@ -1,5 +1,4 @@
-import { getSettings } from "../data/store.js";
-import { esc } from "../utils/format.js";
+import { esc, initials } from "../utils/format.js";
 
 let sequence = 0;
 
@@ -7,11 +6,9 @@ const P_SHAPE =
   "M10 18a10 10 0 0 1 10-10h24a12 12 0 0 1 12 12v12a12 12 0 0 1-12 12H26v9a7 7 0 0 1-7 7h-4a5 5 0 0 1-5-5z";
 const WINDOW = "M22 15h22a4 4 0 0 1 4 4v14a4 4 0 0 1-4 4H22a4 4 0 0 1-4-4V19a4 4 0 0 1 4-4z";
 
+export const PLATFORM_NAME = "PICORA";
+
 export function logoMark(size = 34, { mono = false } = {}) {
-  const settings = getSettings();
-  if (settings.logoDataUrl && !mono) {
-    return `<img src="${settings.logoDataUrl}" alt="" width="${size}" height="${size}" class="rounded-lg object-cover" style="width:${size}px;height:${size}px" />`;
-  }
   if (mono) {
     return `
       <svg width="${size}" height="${size}" viewBox="0 0 64 64" fill="none" aria-hidden="true">
@@ -37,8 +34,7 @@ export function logoMark(size = 34, { mono = false } = {}) {
     </svg>`;
 }
 
-function wordmark({ tone, compact }) {
-  const name = (getSettings().platformName || "PICORA").trim();
+function wordmark(name, { tone, compact }) {
   const color = tone === "dark" ? "text-white" : "text-ink";
   const size = compact ? "text-[13px] tracking-[0.18em]" : "text-[19px] tracking-[0.06em]";
   return `<span class="truncate font-bold uppercase leading-none ${size} ${color}" style="font-family:'Plus Jakarta Sans',sans-serif">${esc(name)}</span>`;
@@ -47,5 +43,23 @@ function wordmark({ tone, compact }) {
 export function logoLockup({ tone = "light", size = 34, compact = false, mono = false } = {}) {
   const gap = compact ? "gap-2" : "gap-2.5";
   const markTone = mono ? (tone === "dark" ? "text-white" : "text-ink") : "";
-  return `<span class="inline-flex min-w-0 items-center ${gap}"><span class="inline-flex shrink-0 ${markTone}">${logoMark(size, { mono })}</span>${wordmark({ tone, compact })}</span>`;
+  return `<span class="inline-flex min-w-0 items-center ${gap}"><span class="inline-flex shrink-0 ${markTone}">${logoMark(size, { mono })}</span>${wordmark(PLATFORM_NAME, { tone, compact })}</span>`;
+}
+
+// A studio's own symbol: the uploaded logo, or its initials on the brand colour.
+export function studioMark(studio, size = 34, { mono = false, tone = "light" } = {}) {
+  const logo = studio?.logoDataUrl || studio?.settings?.logoDataUrl;
+  const style = `width:${size}px;height:${size}px`;
+  if (logo) return `<img src="${logo}" alt="" class="shrink-0 rounded-lg object-cover" style="${style}" />`;
+  const name = studio?.name || PLATFORM_NAME;
+  const fill = mono ? (tone === "dark" ? "border border-white/60 text-white" : "border border-current") : "bg-primary text-white";
+  return `<span class="grid shrink-0 place-items-center rounded-lg font-semibold ${fill}" style="${style};font-size:${Math.round(size * 0.38)}px">${esc(initials(name))}</span>`;
+}
+
+// Gallery headers and footers carry the studio's brand. Without a studio (template
+// demos), they fall back to the PICORA mark.
+export function studioLockup(studio, { tone = "light", size = 34, compact = false, mono = false } = {}) {
+  if (!studio) return logoLockup({ tone, size, compact, mono });
+  const gap = compact ? "gap-2" : "gap-2.5";
+  return `<span class="inline-flex min-w-0 items-center ${gap}">${studioMark(studio, size, { mono, tone })}${wordmark(studio.name, { tone, compact })}</span>`;
 }

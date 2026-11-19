@@ -1,4 +1,4 @@
-import { getAlbum, getNotifications, getSession, getSettings, isNotificationRead } from "../data/store.js";
+import { getAlbum, getNotifications, getSession, isNotificationRead } from "../data/store.js";
 import { esc, initials } from "../utils/format.js";
 import { icon } from "./icons.js";
 
@@ -23,9 +23,7 @@ function breadcrumb(path) {
 }
 
 export function renderHeader(path) {
-  const session = getSession();
-  const settings = getSettings();
-  const name = session?.name || settings.accountName;
+  const name = getSession()?.name || "";
   const notes = getNotifications();
   const unread = notes.filter((note) => !isNotificationRead(note.id)).length;
   const query = new URLSearchParams(location.search).get("q") || "";

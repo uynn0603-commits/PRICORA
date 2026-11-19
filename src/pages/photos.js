@@ -8,6 +8,7 @@ import { photoSrc } from "../data/media.js";
 import {
   addPhotos,
   deletePhotos,
+  galleryPath,
   getAlbum,
   movePhoto,
   reorderPhotos,
@@ -94,7 +95,7 @@ export const photosPage = {
           </div>
           <div class="flex flex-wrap gap-2">
             <a data-link href="/admin/albums/${current.id}/share" class="${ui.secondary}">${icon("share-2", "h-4 w-4")} Chia sẻ</a>
-            <a data-link href="/gallery/${current.slug}" class="${ui.primary}">${icon("eye", "h-4 w-4")} Xem album</a>
+            <a data-link href="${galleryPath(current)}" class="${ui.primary}">${icon("eye", "h-4 w-4")} Xem album</a>
           </div>
         </div>
         ${uploadZone()}

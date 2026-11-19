@@ -1,5 +1,6 @@
 import { pageHeader } from "../components/fields.js";
-import { effectiveStatus, storageStats } from "../data/store.js";
+import { effectiveStatus, getPlan, isOwner, storageStats } from "../data/store.js";
+import { icon } from "../components/icons.js";
 import { esc, formatBytes, formatDate, plural } from "../utils/format.js";
 import { statusBadge } from "../components/badge.js";
 import { ui } from "../utils/ui.js";
@@ -12,22 +13,25 @@ export const storagePage = {
     const stats = storageStats();
     const percent = Math.min(100, Math.round(stats.ratio * 100));
     const bar = stats.ratio >= 0.95 ? "bg-rose-500" : stats.ratio >= 0.8 ? "bg-amber-500" : "bg-primary";
+    const plan = getPlan();
+    const planLink = isOwner() ? `<a data-link href="/admin/settings?tab=plan" class="${ui.secondary}">${icon("credit-card", "h-4 w-4")} Gói dịch vụ</a>` : "";
     return `
       ${pageHeader({
         title: "Lưu trữ",
-        description: "Xem mỗi album đang dùng bao nhiêu dung lượng trong gói của studio.",
+        description: `Xem mỗi album đang dùng bao nhiêu dung lượng trong gói ${plan.name} của studio.`,
+        actions: planLink,
       })}
       ${
         stats.ratio >= 0.8
           ? `<div class="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-950">
               <p class="font-semibold">Dung lượng sắp đầy</p>
-              <p class="mt-1">Bạn đang dùng ${percent}% trên tổng ${formatBytes(stats.quota)}. Hãy xóa những ảnh không còn cần giao, hoặc giữ ảnh tải lên ở dung lượng nhỏ.</p>
+              <p class="mt-1">Bạn đang dùng ${percent}% trên tổng ${formatBytes(stats.quota)} của gói ${esc(plan.name)}. Hãy xóa những ảnh không còn cần giao, hoặc nâng cấp gói để có thêm dung lượng.</p>
             </div>`
           : ""
       }
       <section class="grid gap-4 md:grid-cols-3">
         ${[
-          ["Tổng dung lượng", formatBytes(stats.quota)],
+          [`Dung lượng gói ${plan.name}`, formatBytes(stats.quota)],
           ["Đã sử dụng", formatBytes(stats.used)],
           ["Còn trống", formatBytes(stats.available)],
         ]

@@ -5,7 +5,7 @@ import { pageHeader } from "../components/fields.js";
 import { icon } from "../components/icons.js";
 import { openMenu } from "../components/menu.js";
 import { toast } from "../components/toast.js";
-import { deleteAlbum, effectiveStatus, getAlbum, getAlbums, updateAlbum } from "../data/store.js";
+import { deleteAlbum, effectiveStatus, galleryPath, getAlbum, getAlbums, updateAlbum } from "../data/store.js";
 import { navigate } from "../utils/router.js";
 import { parseISODate } from "../utils/format.js";
 import { ui } from "../utils/ui.js";
@@ -191,7 +191,7 @@ export const albumsPage = {
       if (!album) return;
       const status = effectiveStatus(album);
       openMenu(more, [
-        { label: "Xem album", icon: "eye", onClick: () => navigate(`/gallery/${album.slug}`) },
+        { label: "Xem album", icon: "eye", onClick: () => navigate(galleryPath(album)) },
         { label: "Chỉnh sửa", icon: "pencil", onClick: () => navigate(`/admin/albums/${album.id}/edit`) },
         { label: "Quản lý ảnh", icon: "images", onClick: () => navigate(`/admin/albums/${album.id}/photos`) },
         { label: "Đổi giao diện", icon: "layout-template", onClick: () => navigate(`/admin/albums/${album.id}/template`) },

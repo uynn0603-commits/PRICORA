@@ -6,7 +6,7 @@ import { frame } from "../gallery/GalleryGrid.js";
 import { albumMeta, downloadAllButton } from "../gallery/GalleryHeader.js";
 import { coverImage } from "../gallery/GalleryHero.js";
 import { pad } from "../gallery/model.js";
-import { logoLockup } from "../logo.js";
+import { studioLockup } from "../logo.js";
 
 const BG = "bg-[#F4F1EC]";
 const ACCENT = "text-[#A18B76]";
@@ -112,7 +112,7 @@ export function render(model, { banner = "" } = {}) {
       ${banner}
       <header class="sticky top-0 z-30 bg-[#F4F1EC]/95 backdrop-blur">
         <div class="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-4 px-5 md:px-10">
-          <a href="#" data-scroll="top" aria-label="Lên đầu trang">${logoLockup({ size: 20, compact: true, mono: true })}</a>
+          <a href="#" data-scroll="top" aria-label="Lên đầu trang">${studioLockup(model.studio, { size: 20, compact: true, mono: true })}</a>
           <nav class="hidden items-center gap-8 text-[12px] uppercase tracking-[0.18em] md:flex">
             <a href="#story" data-scroll="story" class="transition hover:text-[#A18B76]">Câu chuyện</a>
             <a href="#gallery" data-scroll="gallery" class="transition hover:text-[#A18B76]">Bộ ảnh</a>
@@ -179,7 +179,7 @@ export function render(model, { banner = "" } = {}) {
             </section>`
           : ""
       }
-      ${galleryFooter({ tone: "paper" })}
+      ${galleryFooter({ tone: "paper", studio: model.studio })}
     </div>`;
 }
 

@@ -2,11 +2,11 @@ import { statusLabel } from "../components/badge.js";
 import { galleryFooter } from "../components/gallery/GalleryFooter.js";
 import { toGalleryModel } from "../components/gallery/model.js";
 import { icon } from "../components/icons.js";
-import { logoLockup } from "../components/logo.js";
+import { studioLockup } from "../components/logo.js";
 import { isTemplateId } from "../components/templates/catalog.js";
 import { getRenderer } from "../components/templates/index.js";
 import { coverSrc } from "../data/media.js";
-import { galleryAccess, getAlbumBySlug, unlock } from "../data/store.js";
+import { applyBrand, galleryAccess, getPublicAlbum, unlock } from "../data/store.js";
 import { esc } from "../utils/format.js";
 import { rerender } from "../utils/router.js";
 import { ui } from "../utils/ui.js";
@@ -27,6 +27,11 @@ const COPY = {
     title: "Album này chưa sẵn sàng",
     body: "Nhiếp ảnh gia vẫn đang chuẩn bị album. Liên kết sẽ mở khi album được xuất bản.",
   },
+  suspended: {
+    eyebrow: "Album không khả dụng",
+    title: "Studio đang tạm ngưng hoạt động",
+    body: "Các album của studio này tạm thời không thể xem. Hãy liên hệ trực tiếp với studio để được hỗ trợ.",
+  },
   invalid: {
     eyebrow: "Album không khả dụng",
     title: "Không tìm thấy album này",
@@ -34,34 +39,38 @@ const COPY = {
   },
 };
 
+function lookup(route) {
+  const { studio, album } = getPublicAlbum(route.params[0], route.params[1]);
+  return { studio, album, access: galleryAccess(album, studio) };
+}
+
 export const galleryPage = {
   title(route) {
-    const album = getAlbumBySlug(route.params[0]);
-    return `${album?.name || "Album"} · PICORA`;
+    const { studio, album } = lookup(route);
+    return `${album?.name || "Album"} · ${studio?.name || "PICORA"}`;
   },
   render(route) {
-    const album = getAlbumBySlug(route.params[0]);
-    const access = galleryAccess(album);
-    if (access.state === "password") return renderGate(album);
-    if (access.state !== "ok") return renderUnavailable(access.state);
-    const model = modelFor(album, route, access);
+    const { studio, album, access } = lookup(route);
+    applyBrand(studio?.settings);
+    if (access.state === "password") return renderGate(album, studio);
+    if (access.state !== "ok") return renderUnavailable(access.state, studio);
+    const model = modelFor(album, studio, route, access);
     return getRenderer(model.templateId).render(model, { banner: studioBanner(album, access, route) });
   },
   mount(route) {
-    const album = getAlbumBySlug(route.params[0]);
-    const access = galleryAccess(album);
+    const { studio, album, access } = lookup(route);
     if (access.state === "password") mountGate(album);
     if (access.state !== "ok") return;
-    const model = modelFor(album, route, access);
+    const model = modelFor(album, studio, route, access);
     getRenderer(model.templateId).mount(model);
   },
 };
 
-// Studio users may preview another template via ?template= before applying it;
+// Studio members may preview another template via ?template= before applying it;
 // clients always see the template saved on the album.
-function modelFor(album, route, access) {
+function modelFor(album, studio, route, access) {
   const override = access.admin && isTemplateId(route.query.template) ? route.query.template : undefined;
-  return toGalleryModel(album, { templateId: override });
+  return toGalleryModel(album, { templateId: override, studio });
 }
 
 function studioBanner(album, access, route) {
@@ -69,7 +78,7 @@ function studioBanner(album, access, route) {
   return `<div class="bg-[#191827] px-4 py-2 text-center font-jakarta text-xs text-white">Chế độ xem trước của studio. Khách hàng hiện thấy album ở trạng thái “${esc(statusLabel(access.status))}”. <a data-link href="/admin/albums/${album.id}/share" class="underline">Chỉnh quyền truy cập</a></div>`;
 }
 
-function renderGate(album) {
+function renderGate(album, studio) {
   const cover = coverSrc(album, 1600);
   return `
     <div class="relative min-h-screen overflow-hidden bg-ink">
@@ -77,7 +86,7 @@ function renderGate(album) {
       <div class="absolute inset-0 bg-ink/55"></div>
       <div class="relative mx-auto flex min-h-screen max-w-md items-center px-4 py-12">
         <div class="w-full rounded-3xl bg-white p-7 sm:p-8">
-          ${logoLockup({ size: 32 })}
+          ${studioLockup(studio, { size: 32 })}
           <h1 class="mt-8 text-2xl font-semibold tracking-tight">Album này được bảo vệ</h1>
           <p class="mt-2 text-sm text-mist">${esc(album.name)}</p>
           <form id="gate-form" class="mt-6 space-y-3">
@@ -101,7 +110,7 @@ function mountGate(album) {
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     if (input.value.trim() === album.password) {
-      unlock(album.slug);
+      unlock(album);
       rerender();
       return;
     }
@@ -112,19 +121,21 @@ function mountGate(album) {
   input.focus();
 }
 
-function renderUnavailable(state) {
+function renderUnavailable(state, studio) {
   const copy = COPY[state] || COPY.invalid;
+  const brand = state === "invalid" ? null : studio;
+  const glyph = state === "expired" ? "calendar" : state === "invalid" ? "link" : "eye-off";
   return `
     <div class="flex min-h-screen flex-col bg-canvas">
-      <header class="px-6 py-5">${logoLockup({ size: 32 })}</header>
+      <header class="px-6 py-5">${studioLockup(brand, { size: 32 })}</header>
       <main class="flex flex-1 items-center justify-center px-6 pb-16">
         <div class="max-w-md text-center">
-          <span class="mx-auto mb-6 grid h-14 w-14 place-items-center rounded-2xl border border-line bg-white text-primary">${icon(state === "expired" ? "calendar" : state === "invalid" ? "link" : "eye-off", "h-6 w-6")}</span>
+          <span class="mx-auto mb-6 grid h-14 w-14 place-items-center rounded-2xl border border-line bg-white text-primary">${icon(glyph, "h-6 w-6")}</span>
           <p class="text-sm font-semibold text-primary">${copy.eyebrow}</p>
           <h1 class="mt-3 text-4xl font-semibold tracking-tight">${copy.title}</h1>
           <p class="mt-4 text-sm leading-relaxed text-mist">${copy.body}</p>
         </div>
       </main>
-      ${galleryFooter({ tone: "light" })}
+      ${galleryFooter({ tone: "light", studio: brand ? { name: brand.name, logoDataUrl: brand.settings?.logoDataUrl, slogan: brand.settings?.slogan } : null })}
     </div>`;
 }

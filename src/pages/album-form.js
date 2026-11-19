@@ -2,7 +2,7 @@ import { pageHeader, selectField, showErrors, textArea, textField } from "../com
 import { confirmDialog } from "../components/dialog.js";
 import { toast } from "../components/toast.js";
 import { coverSrc, readAsDataUrl, setCoverMemory } from "../data/media.js";
-import { createAlbum, getAlbum, getSettings, updateAlbum } from "../data/store.js";
+import { albumLimit, createAlbum, currentStudio, getAlbum, getSettings, isOwner, updateAlbum } from "../data/store.js";
 import { daysUntil, esc, occasionLabel, slugify, toISODate } from "../utils/format.js";
 import { navigate } from "../utils/router.js";
 import { ui } from "../utils/ui.js";
@@ -63,17 +63,27 @@ export const albumFormPage = {
       allowDownload: true,
     };
     const editing = Boolean(existing);
+    const limit = editing ? { ok: true } : albumLimit();
+    const studioPath = `/s/${currentStudio()?.slug || "studio"}/`;
     return `
       ${pageHeader({
         title: editing ? "Chỉnh sửa album" : "Tạo album",
         description: editing ? existing.name : "Nhập thông tin album, sau đó chọn giao diện hiển thị cho khách hàng.",
       })}
+      ${
+        limit.ok
+          ? ""
+          : `<div class="mb-4 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between">
+              <p>${esc(limit.error)}</p>
+              ${isOwner() ? `<a data-link href="/admin/settings?tab=plan" class="${ui.secondary} shrink-0">Xem gói dịch vụ</a>` : ""}
+            </div>`
+      }
       <form id="album-form" class="${ui.card} p-5 sm:p-6" novalidate>
         ${stepper(editing)}
         <div data-step="1" class="grid gap-5 lg:grid-cols-2">
           <div class="space-y-4">
             ${textField({ id: "name", label: "Tên album", value: value.name, required: true, placeholder: "Minh Anh & Hoàng Nam" })}
-            <p class="-mt-2 text-xs text-mist">Liên kết cho khách · <span id="slug-preview" class="font-medium text-ink">/gallery/${esc(existing?.slug || slugify(value.name) || "album")}</span></p>
+            <p class="-mt-2 text-xs text-mist">Liên kết cho khách · <span id="slug-preview" class="font-medium text-ink">${esc(studioPath)}${esc(existing?.slug || slugify(value.name) || "album")}</span></p>
             ${textField({ id: "customerName", label: "Tên khách hàng", value: value.customerName, required: true, placeholder: "Tên khách hàng" })}
             ${textField({ id: "customerPhone", label: "Số điện thoại", value: value.customerPhone, placeholder: "Không bắt buộc" })}
             ${textField({ id: "shootingDate", label: "Ngày chụp", type: "date", value: value.shootingDate, required: true })}
@@ -231,7 +241,7 @@ export const albumFormPage = {
     document.getElementById("status").addEventListener("change", syncLabel);
     document.getElementById("name").addEventListener("input", (event) => {
       const preview = document.getElementById("slug-preview");
-      if (!existing) preview.textContent = `/gallery/${slugify(event.target.value) || "album"}`;
+      if (!existing) preview.textContent = `/s/${currentStudio()?.slug || "studio"}/${slugify(event.target.value) || "album"}`;
     });
     document.getElementById("cover").addEventListener("change", async (event) => {
       const file = event.target.files?.[0];
@@ -318,6 +328,10 @@ export const albumFormPage = {
         return;
       }
       const created = createAlbum({ ...input, ...cover, coverObjectUrl: coverPayload?.coverObjectUrl || "" });
+      if (!created) {
+        toast(albumLimit().error || "Không thể tạo album.", "error");
+        return;
+      }
       if (input.status === "published") {
         toast(`Đã xuất bản album với giao diện ${getTemplateMeta(templateId).name}`);
         navigate(`/admin/albums/${created.id}/share?published=1`);

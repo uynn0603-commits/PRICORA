@@ -4,7 +4,8 @@ import { DEFAULT_TEMPLATE_ID, isTemplateId } from "../templates/catalog.js";
 
 // Converts a stored album into the single shape every template renders from. Templates
 // never read the store directly, so demo albums and real albums behave the same way.
-export function toGalleryModel(album, { templateId } = {}) {
+// `studio` is the owning tenant's public brand; demo albums have none and show PICORA.
+export function toGalleryModel(album, { templateId, studio } = {}) {
   const photos = album.photos.filter((photo) => photoSrc(photo));
   const coverPhoto =
     album.coverPhoto ||
@@ -22,6 +23,9 @@ export function toGalleryModel(album, { templateId } = {}) {
     occasionLabel: occasionLabel(album.occasion),
     description: album.description || "",
     templateId: isTemplateId(requested) ? requested : DEFAULT_TEMPLATE_ID,
+    studio: studio
+      ? { name: studio.name, slug: studio.slug, logoDataUrl: studio.settings?.logoDataUrl || "", slogan: studio.settings?.slogan || "" }
+      : null,
     coverImage: coverSrc(album, 2400),
     coverPhoto,
     photos,
