@@ -1,0 +1,221 @@
+@import "tailwindcss";
+
+:root {
+  --brand-primary: #7552f6;
+  --brand-secondary: #c94deb;
+  --brand-accent: #ffb547;
+  --brand-canvas: #f8f8fc;
+  --brand-ink: #191827;
+  --brand-mist: #77758a;
+  --brand-line: #ebeaf1;
+}
+
+@theme inline {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --color-primary: var(--brand-primary);
+  --color-secondary: var(--brand-secondary);
+  --color-accent: var(--brand-accent);
+  --color-canvas: var(--brand-canvas);
+  --color-ink: var(--brand-ink);
+  --color-mist: var(--brand-mist);
+  --color-line: var(--brand-line);
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--brand-canvas);
+  color: var(--brand-ink);
+  font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--brand-primary) 22%, white);
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+.sidebar-panel {
+  transform: translateX(-105%);
+  transition: transform 0.22s ease;
+}
+
+.sidebar-panel.is-open {
+  transform: translateX(0);
+}
+
+@media (min-width: 1024px) {
+  .sidebar-panel {
+    transform: none;
+  }
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 99px;
+}
+
+.sidebar-scroll:hover::-webkit-scrollbar-thumb {
+  background: #ebeaf1;
+}
+
+.masonry {
+  columns: 2;
+  column-gap: 6px;
+}
+
+.masonry > * {
+  break-inside: avoid;
+  margin-bottom: 6px;
+}
+
+@media (min-width: 560px) {
+  .masonry {
+    columns: 2;
+    column-gap: 12px;
+  }
+
+  .masonry > * {
+    margin-bottom: 12px;
+  }
+}
+
+@media (min-width: 900px) {
+  .masonry {
+    columns: 3;
+    column-gap: 14px;
+  }
+
+  .masonry > * {
+    margin-bottom: 14px;
+  }
+}
+
+@media (min-width: 1500px) {
+  .masonry {
+    columns: 4;
+  }
+}
+
+@utility font-playfair {
+  font-family: "Playfair Display", Georgia, serif;
+}
+
+@utility font-cormorant {
+  font-family: "Cormorant Garamond", Georgia, serif;
+}
+
+@utility font-inter {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+@utility font-jakarta {
+  font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+@keyframes cinematic-in {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.cinematic-in {
+  animation: cinematic-in 1.6s ease-out both;
+}
+
+.rise-in {
+  animation: rise-in 1s ease-out 0.35s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cinematic-in,
+  .rise-in {
+    animation: none;
+  }
+}
+
+.masonry-grid {
+  columns: 2;
+  column-gap: 8px;
+}
+
+.masonry-grid > figure {
+  break-inside: avoid;
+  margin-bottom: 8px;
+}
+
+@media (min-width: 768px) {
+  .masonry-grid {
+    columns: 3;
+    column-gap: 12px;
+  }
+
+  .masonry-grid > figure {
+    margin-bottom: 12px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .masonry-grid {
+    columns: 4;
+    column-gap: 16px;
+  }
+
+  .masonry-grid > figure {
+    margin-bottom: 16px;
+  }
+}
+
+html.is-embedded {
+  scrollbar-width: none;
+}
+
+html.is-embedded::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="color"] {
+  cursor: pointer;
+}
