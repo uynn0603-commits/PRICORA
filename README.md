@@ -1,37 +1,92 @@
 # PICORA
 
-Prototype frontend cho **PICORA** — nền tảng SaaS cho nhiều studio ảnh cùng đăng ký, tạo, quản lý và chia sẻ album cho khách. Slogan: *Your Photos. Your Memories.*
+**PICORA** — nền tảng SaaS cho nhiều studio ảnh cùng đăng ký, tạo, quản lý và chia sẻ album cho khách. Slogan: *Your Photos. Your Memories.*
 
-Ứng dụng chạy hoàn toàn trên trình duyệt. Không có backend và không có database. Studio, tài khoản, album và phiên đăng nhập được lưu trong `localStorage` (key `picora.db.v3`).
+Một repo, một lần deploy:
+
+- **Frontend:** Next.js (App Router) + React + TypeScript + Tailwind CSS. Các trang render phía client và đọc dữ liệu qua `/api`.
+- **Backend:** Hono chạy trong route handler `src/app/api/[...route]/route.ts`, Postgres (Row-Level Security theo studio), ảnh lưu trên Cloudflare R2 (S3 API) hoặc ổ đĩa local khi phát triển.
 
 ## Mô hình SaaS
 
 - **Mỗi studio là một tenant.** Album, ảnh, thương hiệu, thành viên và gói dịch vụ đều thuộc về một studio; màn quản trị chỉ đọc dữ liệu của studio đang đăng nhập.
 - **Đăng ký studio** tại `/signup`: tên studio, địa chỉ studio (slug), tài khoản chủ studio. Studio mới bắt đầu ở gói Miễn phí.
 - **Vai trò:** *Chủ studio* quản lý thương hiệu, thành viên, gói dịch vụ; *Nhân viên* quản lý album, ảnh và chia sẻ. Một tài khoản có thể thuộc nhiều studio và chuyển studio ở khối tên studio trên sidebar.
-- **Gói dịch vụ** (`src/data/plans.js`): Miễn phí (5 GB, 10 album, 2 thành viên), Pro (199.000đ/tháng, 200 GB, 5 thành viên), Business (599.000đ/tháng, 1 TB, 20 thành viên). Store chặn tạo album, thêm thành viên và tải ảnh khi vượt giới hạn. Chưa tích hợp thanh toán: đổi gói có hiệu lực ngay.
+- **Gói dịch vụ** (`src/lib/plans.ts`): Miễn phí (5 GB, 10 album, 2 thành viên), Pro (199.000đ/tháng, 200 GB, 5 thành viên), Business (599.000đ/tháng, 1 TB, 20 thành viên). Server chặn tạo album, thêm thành viên và tải ảnh khi vượt giới hạn. Chưa tích hợp thanh toán: đổi gói có hiệu lực ngay.
 - **Link khách** có dạng `/s/:studio/:album`. Slug album chỉ cần duy nhất trong studio. Gallery dùng logo, màu và khẩu hiệu của studio sở hữu album, chân trang ghi "Vận hành bởi PICORA". Link cũ `/gallery/:album` tự chuyển sang link mới.
 - **Quản trị nền tảng** tại `/platform`: tạo studio mới (chọn gói, gán chủ studio bằng tài khoản mới hoặc email đã có), danh sách studio, dung lượng, đổi gói, tạm khóa / mở lại studio. Studio bị tạm khóa không đăng nhập được và album tạm ẩn với khách.
 
 ## Chạy dự án
 
-Yêu cầu: Node.js 20+.
+Yêu cầu: Node.js 20+, Docker (cho Postgres local).
 
 ```bash
 npm install
+cp .env.example .env.local
+npm run db:up       # Postgres 17 trong Docker, cổng 5434
+npm run db:setup    # tạo bảng, role, RLS rồi nạp dữ liệu demo
 npm run dev
 ```
 
-Mở [http://localhost:5173](http://localhost:5173).
+Mở [http://localhost:5173](http://localhost:5173). Ảnh upload khi phát triển được lưu trong `.data/media` (đã gitignore). `npm run db:seed` đưa database về dữ liệu demo bất cứ lúc nào.
 
-Bản build tĩnh:
+Khi kéo code mới về, chạy `npm run db:migrate`: script chỉ áp dụng các file trong `db/migrations/` chưa chạy (ghi trong bảng `schema_migrations`), không đụng tới dữ liệu đang có.
+
+Kiểm tra kiểu và chạy bản production:
 
 ```bash
+npm run typecheck
 npm run build
-npm run preview
+npm start
 ```
 
-Ảnh minh họa lấy từ Unsplash, nên máy cần có mạng để thấy photography. Giao diện và dữ liệu album vẫn chạy local.
+### Biến môi trường
+
+| Biến | Ý nghĩa |
+| --- | --- |
+| `DATABASE_URL` | Kết nối của ứng dụng. Role này **không** sở hữu bảng nên luôn bị RLS áp dụng. `db:migrate` tự tạo role theo user/mật khẩu trong URL. |
+| `MIGRATION_DATABASE_URL` | Kết nối có quyền owner, chỉ dùng cho `db:migrate` và `db:seed`. |
+| `SESSION_SECRET` | Ký link upload và token mở album có mật khẩu. Production phải là chuỗi ngẫu nhiên dài. |
+| `APP_TIMEZONE` | Múi giờ tính ngày hết hạn album, mặc định `Asia/Ho_Chi_Minh`. |
+| `STORAGE_DRIVER` | `local` (ổ đĩa) hoặc `s3` (R2 / S3). |
+| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Thông tin bucket khi `STORAGE_DRIVER=s3`. Với R2: endpoint `https://<account>.r2.cloudflarestorage.com`, region `auto`. |
+| `MEDIA_PUBLIC_URL` | Domain public của bucket (custom domain hoặc `r2.dev`), không có `/` ở cuối. |
+| `ALLOW_DEMO_RESET` | `true` để bật nút **Khôi phục dữ liệu demo**. Production nên để `false`. |
+
+### Deploy lên Vercel + Neon + R2
+
+1. **Neon:** tạo database, lấy connection string owner làm `MIGRATION_DATABASE_URL`. Đặt `DATABASE_URL` cùng host nhưng user/mật khẩu mới (ví dụ `picora_api` + mật khẩu mạnh), rồi chạy `npm run db:migrate` từ máy với hai biến này để tạo bảng và role. Chỉ chạy `db:seed` nếu muốn có dữ liệu demo. Mỗi lần deploy bản có migration mới, chạy lại `db:migrate` trước.
+2. **R2:** tạo bucket, bật public access (custom domain hoặc `r2.dev`), tạo API token quyền Object Read & Write cho bucket. Thêm CORS cho bucket: `PUT` để trình duyệt upload thẳng, `GET` để nút tải ảnh và tải ZIP đọc được file gốc:
+   ```json
+   [{ "AllowedOrigins": ["https://<domain-của-bạn>"], "AllowedMethods": ["GET", "PUT"], "AllowedHeaders": ["content-type"], "MaxAgeSeconds": 3600 }]
+   ```
+3. **Vercel:** import repo, preset **Next.js**. Khai báo `DATABASE_URL`, `SESSION_SECRET`, `STORAGE_DRIVER=s3`, các biến `S3_*`, `MEDIA_PUBLIC_URL`, `ALLOW_DEMO_RESET=false`. Không cần khai báo `MIGRATION_DATABASE_URL` trên Vercel.
+
+Ảnh đi thẳng từ trình duyệt lên R2 bằng presigned URL, nên giới hạn kích thước request của Vercel không ảnh hưởng tới upload.
+
+### Cấu trúc
+
+| Thư mục | Nội dung |
+| --- | --- |
+| `src/app/` | Route: `/login`, `/signup`, `/platform`, `/admin/*`, `/s/[studio]/[album]`, `/gallery/[slug]`, `/templates/[id]/demo`, `/api/*` |
+| `src/components/` | Shell quản trị, album, cài đặt, gallery, template, overlay (toast, modal, menu) |
+| `src/lib/store.ts` | Bản sao dữ liệu phía trình duyệt (nạp từ `/api/bootstrap`) và các thao tác gọi API |
+| `src/lib/` | Kiểu dữ liệu, gói dịch vụ, catalog template, dữ liệu mẫu, định dạng |
+| `src/server/` | Backend: app Hono, xác thực, phân quyền, truy vấn Postgres, storage, seed |
+| `src/server/routes/` | `auth`, `studio`, `albums`, `public` (gallery khách, gửi lựa chọn), `platform`, `media` (driver local) |
+| `src/server/gallery.ts` | Xác định trạng thái gallery (mở, mật khẩu, hết hạn, ẩn…), dùng chung cho API và metadata |
+| `db/migrations/` | SQL schema và chính sách RLS |
+| `scripts/` | `migrate.ts`, `seed.ts` |
+
+Ảnh minh họa của album demo lấy từ Unsplash, nên máy cần có mạng để thấy photography.
+
+### Bảo mật
+
+- **Cách ly studio:** mọi truy vấn của studio chạy trong transaction đặt `app.studio_id`; chính sách RLS trên `albums`, `photos`, `memberships` chỉ trả về dòng của studio đó, kể cả khi code quên điều kiện `where`.
+- **Phiên đăng nhập:** cookie `HttpOnly`, `SameSite=Lax`; database chỉ lưu SHA-256 của token. Mật khẩu băm PBKDF2-SHA256 (100.000 vòng). Đổi mật khẩu sẽ đăng xuất các phiên khác.
+- **Album có mật khẩu:** server kiểm tra mật khẩu và cấp token ký HMAC; trình duyệt của khách không bao giờ nhận mật khẩu hay ảnh trước khi mở khóa. Giới hạn 10 lần thử / 10 phút cho mỗi IP và album.
+- **Upload:** link upload chỉ ghi được vào thư mục của đúng studio và album, hết hạn sau 15 phút. Server kiểm tra kích thước thật, hạn mức gói và chữ ký tệp (JPG/PNG/WEBP) trước khi gắn ảnh vào album. Bản thu nhỏ cũng được kiểm tra đúng key, đúng định dạng ảnh và giới hạn dung lượng; bản không hợp lệ bị xóa, gallery dùng ảnh gốc thay thế.
+- **Chọn ảnh:** khách chỉ gửi được ID ảnh thuộc chính album đó, trong giới hạn số ảnh studio đặt. Album phải đang mở với khách (đã mở khóa nếu có mật khẩu); chế độ xem trước của studio không gửi được, và danh sách đã chốt thì khách không sửa được.
 
 ## Tài khoản demo
 
@@ -62,22 +117,31 @@ Template nào cũng có cover, tên album, khách hàng, ngày chụp, tổng s�
 - **Change template** (menu album, thẻ album, màn Share) đổi giao diện mà không đổi ảnh, thông tin hay link chia sẻ. Preview ở màn này dùng chính ảnh của album.
 - Tắt **Allow downloads** trong form album để ẩn các nút tải.
 
+### Khách chọn ảnh
+
+Bật **Cho khách chọn ảnh** trong form album (có thể đặt số ảnh tối đa, để trống là không giới hạn). Gallery của mọi template sẽ có nút tim trên từng ảnh và trong lightbox, cùng một thanh lựa chọn ở cuối trang.
+
+- Khách bấm tim để chọn, xem lại các ảnh đã chọn, thêm ghi chú rồi bấm **Gửi cho studio**. Bản nháp được giữ trên trình duyệt nên tải lại trang không mất. Gửi lại sẽ thay danh sách cũ.
+- Studio nhận thông báo và thấy khối **Khách đã chọn** ở trang Quản lý ảnh: lọc chỉ ảnh khách chọn, sao chép tên tệp, tải danh sách `.txt`, **Chốt danh sách** (khách không sửa được nữa) hoặc **Mở lại**, và xóa lựa chọn.
+- Mỗi album giữ một danh sách lựa chọn. Logic nằm ở `src/components/gallery/selection.ts` và `SelectionBar.tsx`, template không cần sửa gì.
+
 ### Thêm template mới
 
-1. Tạo module trong `src/components/templates/` export `render(model, context)`, `mount(model)` và `thumbnail(demoModel)`.
-2. Thêm metadata vào `src/components/templates/catalog.js` và đăng ký renderer trong `src/components/templates/index.js`.
-3. Thêm album mẫu trong `src/data/template-demos.js`.
+1. Tạo component trong `src/components/templates/` export một component gallery (nhận `TemplateProps`) và một component thumbnail.
+2. Thêm metadata vào `src/lib/catalog.ts` và đăng ký trong `RENDERERS` ở `src/components/templates/index.ts`.
+3. Thêm album mẫu trong `src/lib/template-demos.ts`.
 
-Không cần sửa logic quản lý album. Template nhận model chung từ `toGalleryModel()` (`src/components/gallery/model.js`), không đọc store trực tiếp.
+Không cần sửa logic quản lý album. Template nhận model chung từ `toGalleryModel()` (`src/components/gallery/model.ts`), không đọc store trực tiếp.
 
 ## Luồng nên xem
 
 1. Đăng nhập bằng `khoa@minhkhoa.studio`, xem Tổng quan, Album, Lưu trữ, Cài đặt (Studio, Thương hiệu, Thành viên, Gói dịch vụ, Tài khoản).
 2. Tạo album, chọn template ở bước 2, xuất bản, sao chép link ở màn Chia sẻ.
-3. Vào Quản lý ảnh, kéo thả vài ảnh JPG/PNG/WEBP, chọn ảnh bìa, đổi thứ tự, xóa ảnh.
-4. Đăng xuất, đăng nhập `lan@lumiere.vn` để thấy studio khác hoàn toàn tách biệt, hoặc `thuha@minhkhoa.studio` để thấy quyền nhân viên.
-5. Đăng ký studio mới ở `/signup`, hoặc vào `/platform` bằng `admin@picora.vn`.
-6. Mở gallery khách (nên mở ở cửa sổ ẩn danh, vì thành viên studio đang đăng nhập sẽ thấy chế độ xem trước):
+3. Vào Quản lý ảnh, kéo thả vài ảnh JPG/PNG/WEBP, chọn ảnh bìa, đổi thứ tự, xóa ảnh. Ảnh lỗi mạng sẽ tự thử lại; ảnh vẫn lỗi có nút **Thử lại** mà không cần chọn lại tệp.
+4. Mở `/s/minh-khoa-studio/minh-anh-hoang-nam` ở cửa sổ ẩn danh, bấm tim vài ảnh, gửi cho studio. Quay lại Quản lý ảnh của album *Minh Anh & Hoàng Nam* để xem danh sách khách chọn.
+5. Đăng xuất, đăng nhập `lan@lumiere.vn` để thấy studio khác hoàn toàn tách biệt, hoặc `thuha@minhkhoa.studio` để thấy quyền nhân viên.
+6. Đăng ký studio mới ở `/signup`, hoặc vào `/platform` bằng `admin@picora.vn`.
+7. Mở gallery khách (nên mở ở cửa sổ ẩn danh, vì thành viên studio đang đăng nhập sẽ thấy chế độ xem trước):
 
 | Đường dẫn | Trạng thái |
 | --- | --- |
@@ -85,7 +149,7 @@ Không cần sửa logic quản lý album. Template nhận model chung từ `toG
 | `/s/minh-khoa-studio/linh-chi` | Editorial Magazine |
 | `/s/minh-khoa-studio/hoang-long` | Masonry Gallery, 150 ảnh |
 | `/s/minh-khoa-studio/thu-trang-duc-anh` | Dark Cinematic |
-| `/s/minh-khoa-studio/ngoc-ha` | Có mật khẩu. Demo: `prewed98` |
+| `/s/minh-khoa-studio/ngoc-ha` | Có mật khẩu: `prewed98` |
 | `/s/minh-khoa-studio/thanh-tung` | Album đã hết hạn |
 | `/s/minh-khoa-studio/tuan-anh` | Bản nháp, khách chưa xem được |
 | `/s/lumiere-wedding/an-khang-bao-ngoc` | Album của Lumière Wedding, thương hiệu riêng |
@@ -96,9 +160,12 @@ Không cần sửa logic quản lý album. Template nhận model chung từ `toG
 
 ## Ghi chú dữ liệu
 
-- Tạo, sửa, xóa album, template, mật khẩu, hạn dùng, thứ tự ảnh và cài đặt được giữ sau khi refresh.
-- Dữ liệu cũ từ bản trước (một studio) được tự chuyển vào Minh Khoa Studio: album giữ nguyên ảnh, template và cài đặt.
-- Ảnh upload từ máy dùng File API và object URL. Trình duyệt không lưu được file gốc trong `localStorage`, nên preview ảnh upload sẽ mất khi tải lại trang. Ảnh mẫu của album demo vẫn còn.
+- Mọi dữ liệu nằm trong Postgres; ảnh upload nằm trong storage, dùng chung giữa các trình duyệt và thiết bị.
+- Thao tác nhỏ (đổi template, sắp xếp, xóa ảnh, ẩn album, gia hạn, màu thương hiệu) hiển thị ngay và lưu nền theo thứ tự. Nếu server từ chối, giao diện báo lỗi và tải lại dữ liệu từ server.
+- **Ảnh nhỏ:** khi upload, trình duyệt tạo thêm bản preview (cạnh dài 2048px) và thumbnail (1024px) dạng JPEG rồi tải lên cùng ảnh gốc. Gallery và lightbox dùng `srcset` của hai bản này; ảnh gốc chỉ dùng khi khách bấm tải. Canvas chỉ được dùng ẩn để thu nhỏ ảnh, giao diện không vẽ bằng canvas. Ảnh upload trước khi có tính năng này, hoặc ảnh trình duyệt không đọc được, vẫn hiển thị bằng ảnh gốc.
+- **Upload:** tải song song 3 ảnh một lúc. Lỗi mạng, 429 và lỗi 5xx được tự thử lại tối đa 4 lần (chờ tăng dần, chờ có mạng lại); bước xác nhận ảnh an toàn khi gửi lặp lại. Trang cảnh báo trước khi đóng tab nếu còn ảnh đang tải.
+- **Xem trước link trên Zalo/Facebook:** trang `/s/:studio/:album` render metadata phía server (tiêu đề, mô tả, ảnh bìa 1200×630). Album có mật khẩu chỉ hiện tiêu đề, không lộ ảnh; album không khả dụng hiện tiêu đề chung. Gallery luôn gắn `noindex`.
 - Download album đóng gói ZIP bằng JSZip. Nếu một ảnh remote không tải được, file zip vẫn được tạo và ghi chú ảnh đó.
-- Nút **Khôi phục dữ liệu demo** trong Cài đặt → Studio đưa toàn bộ nền tảng về bộ mẫu ban đầu (xóa cả studio tự đăng ký).
-# PRICORA
+- Nút **Khôi phục dữ liệu demo** trong Cài đặt → Studio đưa toàn bộ nền tảng về bộ mẫu ban đầu (xóa cả studio tự đăng ký và ảnh đã upload). Chỉ có khi `ALLOW_DEMO_RESET=true`.
+- Giới hạn số lần thử mật khẩu album được đếm trong bộ nhớ của từng instance server; trên Vercel nhiều instance sẽ đếm riêng. Cần chặt hơn thì chuyển sang Redis/Upstash.
+- URL ảnh trên R2 là public nhưng chứa ID ngẫu nhiên, không đoán được. Mật khẩu album được lưu dạng văn bản để nhân viên studio xem lại và gửi cho khách.

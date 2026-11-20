@@ -1,0 +1,22 @@
+# Local database. Photos are stored on disk in development (STORAGE_DRIVER=local)
+# and in Cloudflare R2 in production (STORAGE_DRIVER=s3).
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: picora
+      POSTGRES_PASSWORD: picora
+      POSTGRES_DB: picora
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U picora -d picora"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:
