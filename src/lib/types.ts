@@ -30,6 +30,8 @@ export interface Album {
   shootingDate: string;
   description: string;
   coverId: string;
+  // Cover for phones; empty falls back to coverId.
+  mobileCoverId: string;
   coverDataUrl: string;
   coverSession: boolean;
   password: string;
@@ -48,9 +50,32 @@ export interface Album {
 }
 
 export interface AlbumSelection {
+  // Favourites; the album's selection limit applies to these only.
   photoIds: string[];
   note: string;
+  // Retouch requests keyed by photo id, independent of the favourites.
+  photoNotes: Record<string, string>;
+  // Studio's answers to those requests, keyed by photo id. Use `editDone` to read them.
+  photoEdits: Record<string, PhotoEdit>;
   submittedAt: string;
+}
+
+export interface PhotoEdit {
+  // The request this answers; a rewritten request makes the entry stale.
+  request: string;
+  reply: string;
+  doneAt: string;
+  // The studio uploaded the retouched file in place of the original.
+  replaced: boolean;
+}
+
+export const PHOTO_NOTE_MAX = 500;
+export const EDIT_REPLY_MAX = 500;
+
+// The studio's answer for a photo, while it still matches the client's current request.
+export function editDone(edits: Record<string, PhotoEdit> | undefined, photoId: string, request: string | undefined): PhotoEdit | null {
+  const edit = edits?.[photoId];
+  return edit && request && edit.request === request ? edit : null;
 }
 
 export interface StudioSettings {
@@ -76,6 +101,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  // Profile photo; without one the UI shows initials.
+  avatarUrl?: string;
   // Only present in the seed data; the API never sends passwords to the browser.
   password?: string;
   platformAdmin?: boolean;

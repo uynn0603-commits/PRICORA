@@ -7,7 +7,7 @@ import { cn, frameLabel } from "@/lib/format";
 import { toast } from "@/lib/overlay";
 import type { Photo } from "@/lib/types";
 import { Icon } from "../ui/Icon";
-import { togglePick, useSelection } from "./selection";
+import { openNote, studioEdit, toggleFavorite, useSelection } from "./selection";
 
 const THEMES = {
   dark: {
@@ -102,11 +102,15 @@ function Lightbox({ state: current }: { state: LightboxState }) {
   const selection = useSelection();
   const pickable = current.selectable && selection;
   const picked = Boolean(pickable && selection.picked.includes(photo.id));
+  const request = pickable ? selection.notes[photo.id] : "";
+  const done = pickable ? studioEdit(selection, photo.id) : null;
 
   useEffect(() => {
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, [role=dialog][aria-labelledby]")) return;
       if (event.key === "Escape") closeLightbox();
       if (event.key === "ArrowLeft") {
         event.preventDefault();
@@ -144,18 +148,27 @@ function Lightbox({ state: current }: { state: LightboxState }) {
         <p className={cn("min-w-16 text-sm font-medium tabular-nums tracking-wide", look.count)}>{frameLabel(current.index, current.photos.length)}</p>
         <div className="flex items-center gap-1">
           {pickable && (
-            <button
-              type="button"
-              onClick={() => togglePick(photo.id)}
-              aria-pressed={picked}
-              className={cn("inline-flex h-11 items-center gap-2 rounded-full px-3 text-sm font-semibold", look.control, picked && "text-rose-500")}
-            >
-              <Icon name="heart" className={cn("h-5 w-5", picked && "fill-current")} />
-              <span className="tabular-nums">
-                {picked ? "Đã chọn" : "Chọn"}
-                {selection.limit ? ` · ${selection.picked.length}/${selection.limit}` : ""}
-              </span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => toggleFavorite(photo.id)}
+                aria-pressed={picked}
+                aria-label={picked ? "Bỏ yêu thích" : "Yêu thích"}
+                className={cn("inline-flex h-11 items-center gap-1.5 rounded-full px-3 text-sm font-semibold tabular-nums", look.control)}
+              >
+                <Icon name="heart" className={cn("h-5 w-5", picked && "fill-current text-rose-500")} />
+                {selection.limit ? `${selection.picked.length}/${selection.limit}` : selection.picked.length}
+              </button>
+              <button
+                type="button"
+                onClick={() => openNote(photo.id)}
+                aria-label={request ? "Xem yêu cầu sửa" : "Yêu cầu sửa ảnh này"}
+                className={cn("relative grid h-11 w-11 place-items-center rounded-full", look.control)}
+              >
+                <Icon name="notebook-pen" className="h-5 w-5" />
+                {request ? <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-amber-500" aria-hidden /> : null}
+              </button>
+            </>
           )}
           {current.allowDownload && (
             <button type="button" onClick={download} className={cn("grid h-11 w-11 place-items-center rounded-full", look.control)} aria-label="Tải ảnh">
@@ -199,6 +212,20 @@ function Lightbox({ state: current }: { state: LightboxState }) {
           <Icon name="chevron-right" className="h-6 w-6" />
         </button>
       </div>
+      {request ? (
+        <button
+          type="button"
+          onClick={() => openNote(photo.id)}
+          className="mx-3 mb-[calc(0.75rem+env(safe-area-inset-bottom))] flex items-start gap-2 rounded-xl bg-white px-4 py-3 text-left text-sm text-[#191827] shadow-sm sm:mx-auto sm:w-full sm:max-w-xl"
+        >
+          <Icon name={done ? "circle-check" : "notebook-pen"} className={cn("mt-0.5 h-4 w-4 shrink-0", done ? "text-emerald-600" : "text-amber-600")} />
+          <span className="min-w-0 flex-1">
+            {done ? <span className="block text-xs font-semibold text-emerald-700">Studio đã sửa{done.reply ? `: “${done.reply}”` : ""}</span> : null}
+            <span className={cn("line-clamp-2 [overflow-wrap:anywhere]", done && "text-[#77758A]")}>{request}</span>
+          </span>
+          <span className="shrink-0 text-xs font-semibold text-[#77758A]">{done ? "Xem" : "Sửa"}</span>
+        </button>
+      ) : null}
     </div>
   );
 }

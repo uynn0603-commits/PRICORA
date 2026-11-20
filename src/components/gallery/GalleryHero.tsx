@@ -9,6 +9,9 @@ export function responsiveSet(photo: Photo | null | undefined, width: number, ra
   return steps.map((step) => `${photoSrc(photo, step, ratio)} ${step}w`).join(", ");
 }
 
+// Matches the `md` breakpoint templates use to switch to their phone layout.
+const PHONE = "(max-width: 767px)";
+
 export function CoverImage({
   model,
   width = 2400,
@@ -25,16 +28,22 @@ export function CoverImage({
   const src = coverUrl(model, width, ratio);
   if (!src) return <div className={`${className} bg-black/10`} />;
   const set = responsiveSet(model.coverPhoto, width, ratio);
+  const mobile = model.mobileCoverPhoto;
+  // Phone hero boxes are upright, so remote mobile covers are cropped to 3:4.
+  const mobileSet = mobile ? responsiveSet(mobile, 1200, 3 / 4) || photoSrc(mobile, 1200, 3 / 4) : "";
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      srcSet={set || undefined}
-      sizes={set ? "100vw" : undefined}
-      alt={alt}
-      fetchPriority="high"
-      decoding="async"
-      className={`${className} object-cover`}
-    />
+    <picture>
+      {mobileSet ? <source media={PHONE} srcSet={mobileSet} sizes="100vw" /> : null}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        srcSet={set || undefined}
+        sizes={set ? "100vw" : undefined}
+        alt={alt}
+        fetchPriority="high"
+        decoding="async"
+        className={`${className} object-cover`}
+      />
+    </picture>
   );
 }

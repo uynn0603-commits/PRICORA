@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { getAlbum, getNotifications, getSession, isNotificationRead, markAllNotificationsRead, markNotificationRead } from "@/lib/store";
-import { cn, initials } from "@/lib/format";
+import { cn } from "@/lib/format";
 import { toast } from "@/lib/overlay";
 import { Icon } from "../ui/Icon";
+import { UserAvatar } from "../ui/UserAvatar";
 
 interface Crumb {
   label: string;
@@ -36,7 +37,7 @@ function breadcrumb(path: string): Crumb[] {
 export function Header({ path, onOpenMenu, onAvatar }: { path: string; onOpenMenu: () => void; onAvatar: (anchor: Element) => void }) {
   const router = useRouter();
   const params = useSearchParams();
-  const name = getSession()?.name || "";
+  const session = getSession();
   const notes = getNotifications();
   const unread = notes.filter((note) => !isNotificationRead(note.id)).length;
   const crumbs = breadcrumb(path);
@@ -152,10 +153,10 @@ export function Header({ path, onOpenMenu, onAvatar }: { path: string; onOpenMen
       <button
         type="button"
         onClick={(event) => onAvatar(event.currentTarget)}
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-white"
+        className="shrink-0 rounded-full"
         aria-label="Menu tài khoản"
       >
-        {initials(name)}
+        <UserAvatar user={session?.user} className="h-10 w-10 text-xs" />
       </button>
     </header>
   );

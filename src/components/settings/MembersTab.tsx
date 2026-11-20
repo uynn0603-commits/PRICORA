@@ -3,7 +3,8 @@
 import { type FormEvent } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
-import { formatDate, initials } from "@/lib/format";
+import { UserAvatar } from "@/components/ui/UserAvatar";
+import { formatDate } from "@/lib/format";
 import { confirmDialog, toast } from "@/lib/overlay";
 import { addMember, currentUser, getMembers, getPlan, removeMember, ROLES, setMemberRole } from "@/lib/store";
 import { ui } from "@/lib/ui";
@@ -64,7 +65,7 @@ export function MembersTab({ reload }: { reload: Reload }) {
             const self = member.user.id === me?.id;
             return (
               <li key={member.user.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{initials(member.user.name)}</span>
+                <UserAvatar user={member.user} tone="soft" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">
                     {member.user.name}

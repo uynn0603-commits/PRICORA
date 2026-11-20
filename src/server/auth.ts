@@ -55,7 +55,7 @@ export const loadAuth: MiddlewareHandler<AppEnv> = createMiddleware<AppEnv>(asyn
   let auth: Auth | null = null;
   if (token) {
     const [row] = await asSystem((tx) => tx<SessionRow[]>`
-      select s.token_hash, s.studio_id, u.id, u.name, u.email, u.platform_admin, m.role,
+      select s.token_hash, s.studio_id, u.id, u.name, u.email, u.platform_admin, u.avatar_key, m.role,
         st.status as studio_status, st.plan_id
       from sessions s
       join users u on u.id = s.user_id

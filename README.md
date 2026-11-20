@@ -86,6 +86,7 @@ npm start
 - **Phiên đăng nhập:** cookie `HttpOnly`, `SameSite=Lax`; database chỉ lưu SHA-256 của token. Mật khẩu băm PBKDF2-SHA256 (100.000 vòng). Đổi mật khẩu sẽ đăng xuất các phiên khác.
 - **Album có mật khẩu:** server kiểm tra mật khẩu và cấp token ký HMAC; trình duyệt của khách không bao giờ nhận mật khẩu hay ảnh trước khi mở khóa. Giới hạn 10 lần thử / 10 phút cho mỗi IP và album.
 - **Upload:** link upload chỉ ghi được vào thư mục của đúng studio và album, hết hạn sau 15 phút. Server kiểm tra kích thước thật, hạn mức gói và chữ ký tệp (JPG/PNG/WEBP) trước khi gắn ảnh vào album. Bản thu nhỏ cũng được kiểm tra đúng key, đúng định dạng ảnh và giới hạn dung lượng; bản không hợp lệ bị xóa, gallery dùng ảnh gốc thay thế.
+- **Ảnh đại diện:** trình duyệt cắt vuông và thu về 512px trước khi tải lên `users/<id người dùng>/`. Server chỉ nhận key trong thư mục của chính tài khoản, tối đa 2 MB, đúng chữ ký ảnh; ảnh cũ bị xóa khi đổi hoặc gỡ.
 - **Chọn ảnh:** khách chỉ gửi được ID ảnh thuộc chính album đó, trong giới hạn số ảnh studio đặt. Album phải đang mở với khách (đã mở khóa nếu có mật khẩu); chế độ xem trước của studio không gửi được, và danh sách đã chốt thì khách không sửa được.
 
 ## Tài khoản demo
@@ -119,10 +120,13 @@ Template nào cũng có cover, tên album, khách hàng, ngày chụp, tổng s�
 
 ### Khách chọn ảnh
 
-Bật **Cho khách chọn ảnh** trong form album (có thể đặt số ảnh tối đa, để trống là không giới hạn). Gallery của mọi template sẽ có nút tim trên từng ảnh và trong lightbox, cùng một thanh lựa chọn ở cuối trang.
+Bật **Cho khách chọn ảnh** trong form album (có thể đặt số ảnh yêu thích tối đa, để trống là không giới hạn). Gallery của mọi template sẽ có hai nút trên từng ảnh và trong lightbox, cùng một thanh lựa chọn ở cuối trang. Khách có hai danh sách độc lập:
 
-- Khách bấm tim để chọn, xem lại các ảnh đã chọn, thêm ghi chú rồi bấm **Gửi cho studio**. Bản nháp được giữ trên trình duyệt nên tải lại trang không mất. Gửi lại sẽ thay danh sách cũ.
-- Studio nhận thông báo và thấy khối **Khách đã chọn** ở trang Quản lý ảnh: lọc chỉ ảnh khách chọn, sao chép tên tệp, tải danh sách `.txt`, **Chốt danh sách** (khách không sửa được nữa) hoặc **Mở lại**, và xóa lựa chọn.
+- **Yêu thích** (trái tim): chạm một lần để thả/bỏ tim, không mở bảng nào. Giới hạn số ảnh chỉ áp dụng cho danh sách này.
+- **Cần sửa** (nút ghi chú): một bảng trượt lên (trên điện thoại) để ghi **yêu cầu chỉnh sửa** cho riêng ảnh đó, gõ tay hoặc chạm gợi ý nhanh (Chỉnh da, Làm sáng, Xóa vật thừa…). Ảnh nào cũng ghi được, không cần thả tim. Trong lightbox, yêu cầu của ảnh hiện ở cuối màn hình để khách xem lại và sửa.
+- Khách xem lại các ảnh đã đánh dấu, thêm ghi chú chung rồi bấm **Gửi cho studio** (cần ít nhất một ảnh yêu thích hoặc một yêu cầu sửa). Bản nháp được giữ trên trình duyệt nên tải lại trang không mất. Gửi lại sẽ thay danh sách cũ.
+- Studio nhận thông báo kèm số ảnh yêu thích và số ảnh cần sửa, và thấy khối lựa chọn của khách ở trang Quản lý ảnh: yêu cầu hiện ngay dưới từng thẻ ảnh; lọc **Tất cả / Yêu thích / Cần sửa**, sao chép tên tệp của danh sách đang xem, tải danh sách `.txt` (hai phần: ảnh yêu thích, rồi ảnh cần sửa kèm yêu cầu), **Chốt danh sách** (khách không sửa được nữa) hoặc **Mở lại**, và xóa lựa chọn.
+- **Báo đã sửa:** trên thẻ ảnh có yêu cầu, studio bấm **Đánh dấu đã sửa**: có thể tải ảnh đã sửa thay ảnh gốc (giữ nguyên vị trí, tên, tim và yêu cầu; file cũ bị xóa) và để lại lời nhắn cho khách. Khách thấy nhãn **Đã sửa** trên ảnh, lời nhắn trong bảng ghi chú/lightbox và dòng "Studio đã sửa xong x/y ảnh" ở thanh dưới. Không có email/SMS: nút **Sao chép tin nhắn báo khách** tạo sẵn nội dung kèm link album để dán vào Zalo. Câu trả lời gắn với đúng nội dung yêu cầu: khách sửa lại yêu cầu và gửi lại thì ảnh tự quay về "Cần sửa". Studio có thể **Hoàn tác**.
 - Mỗi album giữ một danh sách lựa chọn. Logic nằm ở `src/components/gallery/selection.ts` và `SelectionBar.tsx`, template không cần sửa gì.
 
 ### Thêm template mới

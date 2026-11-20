@@ -115,6 +115,34 @@ export function makeVariants(file: File): Promise<ImageVariants | null> {
   return run;
 }
 
+export const AVATAR_EDGE = 512;
+
+// Square crop of the photo, `edge` pixels wide, as JPEG. Null when the browser cannot decode it.
+// Portraits are cut nearer the top, where faces usually are, matching the gallery frames.
+export async function squareJpeg(file: File, edge = AVATAR_EDGE): Promise<Blob | null> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch {
+    return null;
+  }
+  try {
+    const side = Math.min(bitmap.width, bitmap.height);
+    const size = Math.min(edge, side);
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext("2d")!;
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, size, size);
+    context.imageSmoothingQuality = "high";
+    context.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) * 0.2, side, side, 0, 0, size, size);
+    return await toJpeg(canvas, 0.86);
+  } finally {
+    bitmap.close();
+  }
+}
+
 export function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

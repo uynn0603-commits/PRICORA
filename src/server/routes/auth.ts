@@ -7,6 +7,7 @@ import { hashPassword, newId, verifyPassword } from "../crypto";
 import { asStudio, asSystem } from "../db";
 import { listAlbums, listMembers, STUDIO_COLUMNS, toStudio, type StudioRow } from "../data";
 import { EMAIL_RE, emailTaken, slugify, str, studioSlugError } from "../rules";
+import { deleteObjects, isImageObject, isValidKey, objectSize, presignUpload, publicUrl } from "../storage";
 
 export const authRoutes = new Hono<AppEnv>();
 
@@ -136,4 +137,40 @@ authRoutes.patch("/account", requireUser, async (c) => {
     await tx`update users set name = ${name}, email = ${email} where id = ${auth.user.id}`;
     return c.json({ user: { ...auth.user, name, email } });
   });
+});
+
+/* ---------- Profile photo ---------- */
+
+// The browser crops and shrinks the photo before upload, so anything larger is not ours.
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+
+authRoutes.post("/account/avatar/upload", requireUser, async (c) => {
+  const auth = c.get("auth")!;
+  const key = `users/${auth.user.id}/avatar-${newId("ava")}.jpg`;
+  return c.json({ key, uploadUrl: await presignUpload(key) });
+});
+
+// Replaces (or with an empty key, removes) the photo and deletes the previous file.
+authRoutes.put("/account/avatar", requireUser, async (c) => {
+  const auth = c.get("auth")!;
+  const { key: sent } = await c.req.json().catch(() => ({}));
+  const key = String(sent || "");
+  if (key) {
+    if (!isValidKey(key) || !/^users\/[A-Za-z0-9_-]+\/avatar-ava_[A-Za-z0-9]+\.jpg$/.test(key) || !key.startsWith(`users/${auth.user.id}/`)) {
+      return c.json({ error: "Ảnh đại diện không hợp lệ." }, 422);
+    }
+    const size = await objectSize(key);
+    if (size == null || size <= 0) return c.json({ error: "Không tìm thấy ảnh vừa tải lên." }, 422);
+    if (size > MAX_AVATAR_BYTES || !(await isImageObject(key))) {
+      await deleteObjects([key]);
+      return c.json({ error: "Tệp này không phải ảnh hợp lệ." }, 422);
+    }
+  }
+  const previous = await asSystem(async (tx) => {
+    const [row] = await tx<Array<{ avatarKey: string }>>`select avatar_key from users where id = ${auth.user.id}`;
+    await tx`update users set avatar_key = ${key} where id = ${auth.user.id}`;
+    return row?.avatarKey || "";
+  });
+  if (previous && previous !== key) await deleteObjects([previous]);
+  return c.json({ user: { ...auth.user, avatarUrl: publicUrl(key) || undefined } });
 });

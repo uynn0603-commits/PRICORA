@@ -1,5 +1,5 @@
 import { Hono, type Context } from "hono";
-import type { Album } from "@/lib/types";
+import { PHOTO_NOTE_MAX, type Album, type PhotoEdit } from "@/lib/types";
 import type { AppEnv } from "../auth";
 import { safeEqual } from "../crypto";
 import { asSystem } from "../db";
@@ -60,16 +60,30 @@ publicRoutes.put("/public/:studio/:album/selection", async (c) => {
     const known = new Set(album.photos.map((photo) => photo.id));
     const picked = album.photos.filter((photo) => ids.includes(photo.id)).map((photo) => photo.id);
     if (ids.some((id) => !known.has(id))) return c.json({ error: "Một số ảnh không còn trong album. Vui lòng tải lại trang." }, 422);
-    if (!picked.length) return c.json({ error: "Hãy chọn ít nhất một ảnh." }, 422);
     if (album.selectionLimit && picked.length > album.selectionLimit) {
-      return c.json({ error: `Bạn chỉ được chọn tối đa ${album.selectionLimit} ảnh.` }, 422);
+      return c.json({ error: `Bạn chỉ được chọn tối đa ${album.selectionLimit} ảnh yêu thích.` }, 422);
     }
+    // Favourites (photoIds) and retouch requests (photoNotes) are separate lists: a request
+    // may be on any photo of the album. Empty requests are dropped.
+    const sent = body.photoNotes && typeof body.photoNotes === "object" ? (body.photoNotes as Record<string, unknown>) : {};
+    const photoNotes: Record<string, string> = {};
+    for (const photo of album.photos) {
+      const text = String(sent[photo.id] ?? "").trim().slice(0, PHOTO_NOTE_MAX);
+      if (text) photoNotes[photo.id] = text;
+    }
+    if (!picked.length && !Object.keys(photoNotes).length) return c.json({ error: "Hãy chọn ít nhất một ảnh yêu thích hoặc ghi một yêu cầu sửa." }, 422);
+    // A rewritten or removed request reopens the photo, so the studio's answer to it goes.
+    const photoEdits = Object.fromEntries(
+      Object.entries(album.selection?.photoEdits || {}).filter(([id, edit]) => photoNotes[id] && photoNotes[id] === edit.request),
+    ) as Record<string, PhotoEdit>;
     const [row] = await tx<Array<{ submittedAt: Date }>>`
-      insert into album_selections (album_id, studio_id, photo_ids, note, submitted_at)
-      values (${album.id}, ${album.studioId}, ${picked}, ${note}, now())
-      on conflict (album_id) do update set photo_ids = excluded.photo_ids, note = excluded.note, submitted_at = now()
+      insert into album_selections (album_id, studio_id, photo_ids, note, photo_notes, photo_edits, submitted_at)
+      values (${album.id}, ${album.studioId}, ${picked}, ${note}, ${tx.json(photoNotes)}, ${tx.json(photoEdits as never)}, now())
+      on conflict (album_id) do update
+        set photo_ids = excluded.photo_ids, note = excluded.note, photo_notes = excluded.photo_notes,
+          photo_edits = excluded.photo_edits, submitted_at = now()
       returning submitted_at`;
-    return c.json({ selection: { photoIds: picked, note, submittedAt: row.submittedAt.toISOString() } });
+    return c.json({ selection: { photoIds: picked, note, photoNotes, photoEdits, submittedAt: row.submittedAt.toISOString() } });
   });
 });
 

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { photoSrc } from "@/lib/media";
 import { GalleryRoot, ScrollLink } from "../gallery/GalleryActions";
 import { GalleryFooter } from "../gallery/GalleryFooter";
-import { fitsWide, Frame } from "../gallery/GalleryGrid";
+import { fitsWide, Frame, ownRatio, ownWidth } from "../gallery/GalleryGrid";
 import { albumMeta, DownloadAllButton } from "../gallery/GalleryHeader";
 import { CoverImage } from "../gallery/GalleryHero";
 import { pad, type GalleryModel } from "../gallery/model";
@@ -31,8 +31,8 @@ function Scenes({ model }: { model: GalleryModel }) {
             {fitsWide(photo) ? (
               <Frame index={index} ratio={2.39} aspect="aspect-[16/10] sm:aspect-[2.39/1]" width={2400} className="bg-[#1B1B1B]" imgClass={IMG} />
             ) : (
-              <div className="mx-auto max-w-[560px]">
-                <Frame index={index} ratio={4 / 5} width={1200} sizes="(min-width: 640px) 560px, 100vw" className="bg-[#1B1B1B]" imgClass={IMG} />
+              <div className="mx-auto" style={{ maxWidth: ownWidth(photo, 560) }}>
+                <Frame index={index} ratio={ownRatio(photo)} width={1200} sizes="(min-width: 640px) 560px, 100vw" className="bg-[#1B1B1B]" imgClass={IMG} />
               </div>
             )}
             <figcaption className={`mt-4 flex items-center justify-between text-[11px] uppercase tracking-[0.3em] ${MUTED}`}>

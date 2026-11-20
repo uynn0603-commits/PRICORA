@@ -1,5 +1,5 @@
 import { studioSettings } from "@/lib/mock";
-import type { Album, AlbumStatus, Membership, Photo, Role, Studio, StudioSettings, StudioStatus, User } from "@/lib/types";
+import type { Album, AlbumStatus, Membership, Photo, PhotoEdit, Role, Studio, StudioSettings, StudioStatus, User } from "@/lib/types";
 import type { Tx } from "./db";
 import { publicUrl } from "./storage";
 
@@ -20,6 +20,7 @@ export interface UserRow {
   name: string;
   email: string;
   platformAdmin: boolean;
+  avatarKey?: string;
 }
 
 interface AlbumRow {
@@ -33,6 +34,7 @@ interface AlbumRow {
   shootingDate: string;
   description: string;
   coverId: string;
+  mobileCoverId: string;
   coverKey: string;
   password: string;
   expiresAt: string;
@@ -42,7 +44,13 @@ interface AlbumRow {
   selectionEnabled: boolean;
   selectionLimit: number | null;
   selectionLocked: boolean;
-  selection: { photo_ids: string[]; note: string; submitted_at: string } | null;
+  selection: {
+    photo_ids: string[];
+    note: string;
+    photo_notes?: Record<string, string>;
+    photo_edits?: Record<string, PhotoEdit>;
+    submitted_at: string;
+  } | null;
   createdAt: Date;
   updatedAt: Date;
   expired: boolean;
@@ -78,7 +86,7 @@ export function toStudio(row: StudioRow): Studio {
 }
 
 export function toUser(row: UserRow): User {
-  return { id: row.id, name: row.name, email: row.email, platformAdmin: row.platformAdmin || undefined };
+  return { id: row.id, name: row.name, email: row.email, avatarUrl: publicUrl(row.avatarKey || "") || undefined, platformAdmin: row.platformAdmin || undefined };
 }
 
 export function toPhoto(row: PhotoRow): Photo {
@@ -113,6 +121,7 @@ function toAlbum(row: AlbumRow, photos: Photo[]): Album {
     shootingDate: row.shootingDate,
     description: row.description,
     coverId: row.coverId,
+    mobileCoverId: row.mobileCoverId,
     coverDataUrl: publicUrl(row.coverKey),
     coverSession: false,
     password: row.password,
@@ -127,6 +136,8 @@ function toAlbum(row: AlbumRow, photos: Photo[]): Album {
       ? {
           photoIds: row.selection.photo_ids,
           note: row.selection.note,
+          photoNotes: row.selection.photo_notes || {},
+          photoEdits: row.selection.photo_edits || {},
           submittedAt: new Date(row.selection.submitted_at).toISOString(),
         }
       : null,
@@ -152,7 +163,7 @@ export async function findStudioBySlug(tx: Tx, slug: string): Promise<StudioRow 
 
 const ALBUM_SELECT = `
   select id, studio_id, slug, name, customer_name, customer_phone, occasion,
-    coalesce(shooting_date::text, '') as shooting_date, description, cover_id, cover_key, password,
+    coalesce(shooting_date::text, '') as shooting_date, description, cover_id, mobile_cover_id, cover_key, password,
     coalesce(expires_at::text, '') as expires_at, status, template_id, allow_download, created_at, updated_at,
     selection_enabled, selection_limit, selection_locked,
     (select to_jsonb(s) from album_selections s where s.album_id = albums.id) as selection,
@@ -198,7 +209,7 @@ export interface MemberView extends Membership {
 
 export async function listMembers(tx: Tx, studioId: string): Promise<MemberView[]> {
   const rows = await tx<Array<UserRow & { role: Role; createdAt: Date }>>`
-    select u.id, u.name, u.email, u.platform_admin, m.role, m.created_at
+    select u.id, u.name, u.email, u.platform_admin, u.avatar_key, m.role, m.created_at
     from memberships m join users u on u.id = m.user_id
     where m.studio_id = ${studioId}
     order by case m.role when 'owner' then 0 else 1 end, u.name`;

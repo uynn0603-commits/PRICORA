@@ -438,7 +438,7 @@ function AlbumFormBody({ existing }: { existing: Album | null }) {
                 />
                 <span>
                   <span className="block text-sm font-semibold">Cho khách chọn ảnh</span>
-                  <span className="mt-0.5 block text-xs text-mist">Khách thả tim những ảnh muốn chỉnh sửa hoặc in, rồi gửi danh sách kèm ghi chú cho studio.</span>
+                  <span className="mt-0.5 block text-xs text-mist">Khách thả tim những ảnh yêu thích và ghi yêu cầu sửa cho từng ảnh (hai danh sách riêng), rồi gửi cho studio.</span>
                 </span>
               </label>
               {values.selectionEnabled && (
@@ -454,7 +454,7 @@ function AlbumFormBody({ existing }: { existing: Album | null }) {
                     value={values.selectionLimit}
                     onChange={(event) => set("selectionLimit", event.target.value)}
                   />
-                  <span className="text-sm text-mist">ảnh (để trống nếu không giới hạn)</span>
+                  <span className="text-sm text-mist">ảnh yêu thích (để trống nếu không giới hạn)</span>
                 </label>
               )}
             </div>

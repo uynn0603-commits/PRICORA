@@ -3,7 +3,7 @@
 import type { DragEvent } from "react";
 import { cn, formatBytes, formatDate } from "@/lib/format";
 import { photoSrc } from "@/lib/media";
-import type { Album, Photo } from "@/lib/types";
+import type { Album, Photo, PhotoEdit } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
 
 export function PhotoCard({
@@ -15,6 +15,10 @@ export function PhotoCard({
   onDragStart,
   onDrop,
   picked = false,
+  request,
+  edit,
+  onEdit,
+  onUndoEdit,
   sortable = true,
 }: {
   photo: Photo;
@@ -25,6 +29,12 @@ export function PhotoCard({
   onDragStart: (id: string, event: DragEvent<HTMLButtonElement>) => void;
   onDrop: (id: string, event: DragEvent<HTMLElement>) => void;
   picked?: boolean;
+  // The client's retouch request for this photo, independent of `picked` (a favourite).
+  request?: string;
+  // The studio's answer, only while it still matches `request`.
+  edit?: PhotoEdit | null;
+  onEdit?: (id: string) => void;
+  onUndoEdit?: (id: string) => void;
   sortable?: boolean;
 }) {
   const src = photoSrc(photo, 700);
@@ -55,11 +65,16 @@ export function PhotoCard({
         </label>
         <span className="absolute right-2 top-2 z-10 flex gap-1">
           {picked ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-rose-500" title="Khách đã chọn">
-              <Icon name="heart" className="h-3 w-3 fill-current" /> Khách chọn
+            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-rose-500" title="Khách yêu thích ảnh này">
+              <Icon name="heart" className="h-3 w-3 fill-current" /> Yêu thích
             </span>
           ) : null}
           {isCover ? <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-ink">Ảnh bìa</span> : null}
+          {album.mobileCoverId === photo.id ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-ink" title="Ảnh bìa trên điện thoại">
+              <Icon name="smartphone" className="h-3 w-3" /> Bìa ĐT
+            </span>
+          ) : null}
         </span>
         <button type="button" onClick={() => onPreview(photo.id)} className="absolute inset-0 z-[1]" aria-label={`Xem ${photo.name}`} />
       </div>
@@ -82,6 +97,42 @@ export function PhotoCard({
           </button>
         ) : null}
       </div>
+      {request && edit ? (
+        <div className="mt-1.5 rounded-lg bg-emerald-50 px-2.5 py-2 text-[12px] leading-snug text-ink">
+          <p className="flex items-center gap-1.5 font-semibold text-emerald-700">
+            <Icon name="circle-check" className="h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">
+              Đã sửa · {formatDate(edit.doneAt)}
+              {edit.replaced ? " · đã thay ảnh" : ""}
+            </span>
+            {onUndoEdit ? (
+              <button type="button" onClick={() => onUndoEdit(photo.id)} className="shrink-0 font-medium text-mist hover:text-ink">
+                Hoàn tác
+              </button>
+            ) : null}
+          </p>
+          <p className="mt-1 line-clamp-2 whitespace-pre-line text-mist [overflow-wrap:anywhere]" title={request}>
+            {request}
+          </p>
+          {edit.reply ? <p className="mt-1 line-clamp-3 whitespace-pre-line [overflow-wrap:anywhere]">“{edit.reply}”</p> : null}
+        </div>
+      ) : request ? (
+        <div className="mt-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-[12px] leading-snug text-ink">
+          <p className="flex gap-1.5" title={request}>
+            <Icon name="notebook-pen" className="mt-px h-3.5 w-3.5 shrink-0 text-amber-700" />
+            <span className="line-clamp-3 min-w-0 whitespace-pre-line [overflow-wrap:anywhere]">{request}</span>
+          </p>
+          {onEdit ? (
+            <button
+              type="button"
+              onClick={() => onEdit(photo.id)}
+              className="mt-2 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-amber-200 bg-white font-semibold text-amber-800 hover:bg-amber-100"
+            >
+              <Icon name="check" className="h-3.5 w-3.5" /> Đánh dấu đã sửa
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }

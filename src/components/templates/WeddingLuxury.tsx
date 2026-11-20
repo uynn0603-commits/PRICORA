@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { photoSrc } from "@/lib/media";
 import { GalleryRoot, ScrollLink } from "../gallery/GalleryActions";
 import { GalleryFooter } from "../gallery/GalleryFooter";
-import { fitsWide, Frame } from "../gallery/GalleryGrid";
+import { fitsWide, Frame, ownRatio, ownWidth } from "../gallery/GalleryGrid";
 import { albumMeta, DownloadAllButton } from "../gallery/GalleryHeader";
 import { CoverImage } from "../gallery/GalleryHero";
 import { splitCouple, type GalleryModel } from "../gallery/model";
@@ -54,8 +54,8 @@ function Gallery({ model }: { model: GalleryModel }) {
       index += 1;
     } else if (kind === "full" || kind === "single") {
       blocks.push(
-        <div key={index} className="mx-auto max-w-[720px]">
-          <Frame index={index} ratio={4 / 5} width={1400} className="bg-[#EAE5DC]" imgClass={IMG_HOVER} />
+        <div key={index} className="mx-auto" style={{ maxWidth: ownWidth(model.photos[index], 720) }}>
+          <Frame index={index} ratio={ownRatio(model.photos[index])} width={1400} sizes="(min-width: 768px) 720px, 100vw" className="bg-[#EAE5DC]" imgClass={IMG_HOVER} />
         </div>,
       );
       index += 1;
@@ -80,11 +80,11 @@ export function WeddingLuxury({ model, banner }: TemplateProps) {
     <GalleryRoot model={model} lightbox="ivory" pageBg="#FAF9F6" className={`font-inter min-h-screen bg-[#FAF9F6] ${INK}`}>
       {banner}
       <header className="sticky top-0 z-30 border-b border-[#EAE5DC] bg-[#FAF9F6]/95 backdrop-blur">
-        <div className="mx-auto grid h-16 max-w-[1500px] grid-cols-[auto_1fr_auto] items-center gap-4 px-4 md:grid-cols-[1fr_auto_1fr] md:px-10">
+        <div className="mx-auto grid h-16 max-w-[1500px] grid-cols-[auto_1fr] items-center gap-4 px-4 md:grid-cols-[1fr_auto_1fr] md:px-10">
           <ScrollLink to="top" className="opacity-80 transition hover:opacity-100" label="Lên đầu trang">
             <StudioLockup studio={model.studio} size={20} compact mono />
           </ScrollLink>
-          <p className="truncate text-center font-playfair text-[15px] italic md:text-base">{model.title}</p>
+          <p className="hidden truncate text-center font-playfair text-base italic md:block">{model.title}</p>
           <nav className="flex items-center justify-end gap-6">
             <ScrollLink to="gallery" className="hidden text-[12px] uppercase tracking-[0.16em] text-[#29251F]/70 transition hover:text-[#B99A72] sm:inline">
               Bộ ảnh

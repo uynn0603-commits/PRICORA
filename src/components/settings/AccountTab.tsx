@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
+import { Icon } from "@/components/ui/Icon";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { cn } from "@/lib/format";
 import { toast } from "@/lib/overlay";
-import { currentUser, updateAccount } from "@/lib/store";
+import { changeAvatar, currentUser, removeAvatar, updateAccount } from "@/lib/store";
 import { ui } from "@/lib/ui";
 import type { Reload } from "./types";
 
@@ -42,6 +44,7 @@ export function AccountTab({ reload }: { reload: Reload }) {
 
   return (
     <form id="account-form" className={`${ui.card} max-w-2xl space-y-4 p-5 sm:p-6`} onSubmit={submit}>
+      <AvatarPicker />
       <label className="block">
         <span className={ui.label}>Họ và tên</span>
         <input id="accountName" value={name} onChange={(event) => setName(event.target.value)} className={ui.input} />
@@ -87,5 +90,63 @@ export function AccountTab({ reload }: { reload: Reload }) {
         </button>
       </div>
     </form>
+  );
+}
+
+// Saves on its own as soon as a photo is picked; it does not wait for "Lưu tài khoản".
+function AvatarPicker() {
+  const user = currentUser();
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState<"" | "upload" | "remove">("");
+
+  const pick = async (file: File | undefined) => {
+    if (input.current) input.current.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return toast("Vui lòng chọn một tệp ảnh.", "error");
+    setBusy("upload");
+    const result = await changeAvatar(file);
+    setBusy("");
+    if (!result.ok) return toast(result.error, "error");
+    toast("Đã đổi ảnh đại diện");
+  };
+
+  const remove = async () => {
+    setBusy("remove");
+    const result = await removeAvatar();
+    setBusy("");
+    if (!result.ok) return toast(result.error, "error");
+    toast("Đã gỡ ảnh đại diện");
+  };
+
+  return (
+    <div className="flex items-center gap-4 border-b border-line pb-5">
+      <button
+        type="button"
+        onClick={() => input.current?.click()}
+        disabled={Boolean(busy)}
+        className="relative shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        aria-label="Đổi ảnh đại diện"
+      >
+        <UserAvatar user={user} className={cn("h-20 w-20 text-xl", busy && "opacity-50")} />
+        <span className="absolute -bottom-0.5 -right-0.5 grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-ink text-white">
+          <Icon name={busy === "upload" ? "loader" : "camera"} className={cn("h-3.5 w-3.5", busy === "upload" && "animate-spin")} />
+        </span>
+      </button>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">Ảnh đại diện</p>
+        <p className="mt-0.5 text-xs text-mist">Ảnh được cắt vuông, ảnh dọc giữ phần phía trên. Đổi xong là lưu ngay.</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button type="button" onClick={() => input.current?.click()} disabled={Boolean(busy)} className={cn(ui.secondary, "h-9 px-3 text-xs")}>
+            {busy === "upload" ? "Đang tải lên…" : user?.avatarUrl ? "Đổi ảnh" : "Tải ảnh lên"}
+          </button>
+          {user?.avatarUrl ? (
+            <button type="button" onClick={remove} disabled={Boolean(busy)} className={cn(ui.ghost, "h-9 px-3 text-xs")}>
+              {busy === "remove" ? "Đang gỡ…" : "Gỡ ảnh"}
+            </button>
+          ) : null}
+        </div>
+      </div>
+      <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => pick(event.target.files?.[0])} />
+    </div>
   );
 }

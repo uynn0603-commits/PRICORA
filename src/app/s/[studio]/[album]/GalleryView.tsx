@@ -58,6 +58,12 @@ export function GalleryView() {
 
   useEffect(() => {
     void loadPublicGallery(params.studio, params.album);
+    // Coming back to the tab picks up what the studio changed meanwhile (e.g. retouched photos).
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void loadPublicGallery(params.studio, params.album);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [params.studio, params.album]);
 
   useLayoutEffect(() => {

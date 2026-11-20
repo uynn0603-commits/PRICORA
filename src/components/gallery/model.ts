@@ -20,7 +20,7 @@ export type GalleryAlbum = Pick<
   | "password"
   | "photos"
 > &
-  Partial<Pick<Album, "selectionEnabled" | "selectionLimit" | "selectionLocked" | "selection">> & { coverPhoto?: Photo | null };
+  Partial<Pick<Album, "mobileCoverId" | "selectionEnabled" | "selectionLimit" | "selectionLocked" | "selection">> & { coverPhoto?: Photo | null };
 
 export interface GallerySelection {
   studioSlug: string;
@@ -43,8 +43,10 @@ export interface GalleryModel {
   studio: GalleryStudio | null;
   coverImage: string;
   coverPhoto: Photo | null;
-  // The photos laid out below the cover. The cover already fills the hero, so it is
-  // left out here; `allPhotos` still has it for the lightbox, downloads, picks and counts.
+  // Replaces the cover on phones when the studio picked one.
+  mobileCoverPhoto: Photo | null;
+  // The photos laid out below the cover. The covers already fill the hero, so they are
+  // left out here; `allPhotos` still has them for the lightbox, downloads, picks and counts.
   photos: Photo[];
   allPhotos: Photo[];
   photoCount: number;
@@ -71,7 +73,10 @@ export function toGalleryModel(
     photos.find((photo) => photo.id === album.coverId) ||
     (album.coverDataUrl || album.coverSession ? null : photos[0]) ||
     null;
-  const body = photos.length > 1 && coverPhoto ? photos.filter((photo) => photo.id !== coverPhoto.id) : photos;
+  const mobileCoverPhoto = (album.mobileCoverId && photos.find((photo) => photo.id === album.mobileCoverId)) || null;
+  const covers = new Set([coverPhoto?.id, mobileCoverPhoto?.id].filter(Boolean));
+  const rest = photos.filter((photo) => !covers.has(photo.id));
+  const body = rest.length ? rest : photos;
   const requested = templateId || album.templateId;
   return {
     id: album.id,
@@ -88,6 +93,7 @@ export function toGalleryModel(
       : null,
     coverImage: coverSrc(album, 2400),
     coverPhoto,
+    mobileCoverPhoto,
     photos: body,
     allPhotos: photos,
     photoCount: photos.length,

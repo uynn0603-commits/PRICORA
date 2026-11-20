@@ -4,6 +4,7 @@ import { getPlanById } from "@/lib/plans";
 import { requireStudio, studioOf, type AppEnv } from "../auth";
 import { newId } from "../crypto";
 import { asStudio, type Tx } from "../db";
+import { EDIT_REPLY_MAX, type PhotoEdit } from "@/lib/types";
 import { getAlbum, PHOTO_COLUMNS, studioUsage, toPhoto, type PhotoRow } from "../data";
 import { DATE_RE, str, uniqueAlbumSlug } from "../rules";
 import { deleteObjects, isImageObject, isValidKey, MAX_PHOTO_BYTES, objectSize, presignUpload } from "../storage";
@@ -68,6 +69,7 @@ function albumColumns(input: Record<string, unknown>, studioId: string, creating
   }
   if ("selectionLocked" in input) columns.selection_locked = input.selectionLocked === true;
   if ("coverId" in input) columns.cover_id = str(input.coverId, 80);
+  if ("mobileCoverId" in input) columns.mobile_cover_id = str(input.mobileCoverId, 80);
   if ("coverKey" in input) {
     const key = String(input.coverKey || "");
     if (key && (!isValidKey(key) || !key.startsWith(`studios/${studioId}/covers/`))) return "Ảnh bìa không hợp lệ.";
@@ -87,8 +89,8 @@ async function coverIsImage(columns: Record<string, unknown>): Promise<boolean> 
 }
 
 async function albumOr404(tx: Tx, studioId: string, albumId: string) {
-  const [row] = await tx<Array<{ id: string; coverId: string; coverKey: string }>>`
-    select id, cover_id, cover_key from albums where id = ${albumId} and studio_id = ${studioId}`;
+  const [row] = await tx<Array<{ id: string; coverId: string; mobileCoverId: string; coverKey: string }>>`
+    select id, cover_id, mobile_cover_id, cover_key from albums where id = ${albumId} and studio_id = ${studioId}`;
   return row || null;
 }
 
@@ -180,6 +182,46 @@ albumRoutes.delete("/albums/:id/selection", async (c) => {
   });
 });
 
+// Marks a retouch request as done (with an optional reply for the client), or with
+// DELETE takes that back. The answer is tied to the request text it was made for.
+albumRoutes.put("/albums/:id/selection/edits/:photoId", async (c) => {
+  const { studioId } = studioOf(c);
+  const albumId = c.req.param("id");
+  const photoId = c.req.param("photoId");
+  const body = await c.req.json().catch(() => ({}));
+  return asStudio(studioId, async (tx) => {
+    const album = await getAlbum(tx, studioId, albumId);
+    if (!album) return c.json({ error: "Không tìm thấy album." }, 404);
+    const request = album.selection?.photoNotes[photoId];
+    if (!request) return c.json({ error: "Khách không còn yêu cầu sửa ảnh này. Vui lòng tải lại trang." }, 409);
+    const edit: PhotoEdit = {
+      request,
+      reply: String(body.reply ?? "").trim().slice(0, EDIT_REPLY_MAX),
+      doneAt: new Date().toISOString(),
+      replaced: Boolean(body.replaced),
+    };
+    await tx`
+      update album_selections set photo_edits = photo_edits || ${tx.json({ [photoId]: edit } as never)}
+      where album_id = ${albumId}`;
+    return c.json({ selection: { ...album.selection!, photoEdits: { ...album.selection!.photoEdits, [photoId]: edit } } });
+  });
+});
+
+albumRoutes.delete("/albums/:id/selection/edits/:photoId", async (c) => {
+  const { studioId } = studioOf(c);
+  const albumId = c.req.param("id");
+  const photoId = c.req.param("photoId");
+  return asStudio(studioId, async (tx) => {
+    const album = await getAlbum(tx, studioId, albumId);
+    if (!album) return c.json({ error: "Không tìm thấy album." }, 404);
+    if (!album.selection) return c.json({ error: "Khách chưa gửi lựa chọn." }, 409);
+    await tx`update album_selections set photo_edits = photo_edits - ${photoId} where album_id = ${albumId}`;
+    const photoEdits = { ...album.selection.photoEdits };
+    delete photoEdits[photoId];
+    return c.json({ selection: { ...album.selection, photoEdits } });
+  });
+});
+
 /* ---------- Photos ---------- */
 
 albumRoutes.put("/albums/:id/photos/order", async (c) => {
@@ -215,6 +257,7 @@ albumRoutes.post("/albums/:id/photos/delete", async (c) => {
         update albums set cover_id = coalesce((select id from photos where album_id = ${albumId} order by position, id limit 1), '')
         where id = ${albumId}`;
     }
+    if (remove.includes(current.mobileCoverId)) await tx`update albums set mobile_cover_id = '' where id = ${albumId}`;
     await tx`update albums set updated_at = now() where id = ${albumId}`;
     const [album] = await tx<Array<{ coverId: string }>>`select cover_id from albums where id = ${albumId}`;
     return { keys: deleted.flatMap((row) => [row.storageKey || "", row.previewKey || "", row.thumbKey || ""]), coverId: album.coverId };
@@ -321,6 +364,89 @@ albumRoutes.post("/albums/:id/photos", async (c) => {
     return c.json({ error: result.error }, result.status);
   }
   return c.json(result, 201);
+});
+
+// Replacing a photo's file (e.g. with the retouched version) keeps its id, position, name,
+// favourites and requests. Each replacement gets new keys, so cached copies never go stale.
+const REVISION_RE = /^rev_[A-Za-z0-9]+$/;
+const PHOTO_ID_RE = /^[A-Za-z0-9_-]+$/;
+
+function revisionKeys(studioId: string, albumId: string, photoId: string, revision: string, ext: string) {
+  const base = `studios/${studioId}/albums/${albumId}/${photoId}_${revision}`;
+  return { key: `${base}.${ext}`, preview: `${base}_preview.jpg`, thumb: `${base}_thumb.jpg` };
+}
+
+albumRoutes.post("/albums/:id/photos/:photoId/replace", async (c) => {
+  const { studioId, planId } = studioOf(c);
+  const albumId = c.req.param("id");
+  const photoId = c.req.param("photoId");
+  const body = await c.req.json().catch(() => ({}));
+  const ext = extensionOf(String(body.name || ""), String(body.type || ""));
+  const size = Number(body.size) || 0;
+  if (!PHOTO_ID_RE.test(photoId)) return c.json({ error: "Không tìm thấy ảnh." }, 404);
+  if (!ext || size <= 0) return c.json({ error: "Chỉ chấp nhận tệp JPG, PNG hoặc WEBP." }, 422);
+  if (size > MAX_PHOTO_BYTES) return c.json({ error: "Ảnh vượt quá 60 MB." }, 422);
+  return asStudio(studioId, async (tx) => {
+    const [photo] = await tx<Array<{ size: number }>>`select size from photos where id = ${photoId} and album_id = ${albumId} and studio_id = ${studioId}`;
+    if (!photo) return c.json({ error: "Không tìm thấy ảnh." }, 404);
+    const quota = await quotaError(tx, studioId, planId, Math.max(0, size - Number(photo.size)));
+    if (quota) return c.json({ error: quota }, 422);
+    const revision = newId("rev");
+    const keys = revisionKeys(studioId, albumId, photoId, revision, ext);
+    return c.json({
+      revision,
+      key: keys.key,
+      uploadUrl: await presignUpload(keys.key),
+      variants: {
+        preview: { key: keys.preview, uploadUrl: await presignUpload(keys.preview) },
+        thumb: { key: keys.thumb, uploadUrl: await presignUpload(keys.thumb) },
+      },
+    });
+  });
+});
+
+albumRoutes.put("/albums/:id/photos/:photoId/file", async (c) => {
+  const { studioId, planId } = studioOf(c);
+  const albumId = c.req.param("id");
+  const photoId = c.req.param("photoId");
+  const body = await c.req.json().catch(() => ({}));
+  const revision = String(body.revision || "");
+  const key = String(body.key || "");
+  const ext = key.split(".").pop() || "";
+  const keys = REVISION_RE.test(revision) && PHOTO_ID_RE.test(photoId) ? revisionKeys(studioId, albumId, photoId, revision, ext) : null;
+  if (!keys || key !== keys.key || !IMAGE_EXT.has(ext) || !isValidKey(key)) return c.json({ error: "Tệp tải lên không hợp lệ." }, 422);
+  const size = await objectSize(key);
+  if (size == null || size <= 0) return c.json({ error: "Không tìm thấy tệp vừa tải lên." }, 422);
+  if (!(await isImageObject(key))) {
+    await deleteObjects([key]);
+    return c.json({ error: "Tệp này không phải ảnh JPG, PNG hoặc WEBP hợp lệ." }, 422);
+  }
+  const previewKey = await acceptVariant(keys.preview, body.previewKey, MAX_VARIANT_BYTES.preview);
+  const thumbKey = await acceptVariant(keys.thumb, body.thumbKey, MAX_VARIANT_BYTES.thumb);
+  const uploaded = [key, previewKey, thumbKey].filter((value): value is string => Boolean(value));
+  const width = Math.max(1, Math.round(Number(body.w) || 4));
+  const height = Math.max(1, Math.round(Number(body.h) || 3));
+  const result = await asStudio(studioId, async (tx) => {
+    const [old] = await tx<Array<{ storageKey: string | null; previewKey: string | null; thumbKey: string | null; size: number }>>`
+      select storage_key, preview_key, thumb_key, size from photos where id = ${photoId} and album_id = ${albumId} and studio_id = ${studioId}`;
+    if (!old) return { status: 404 as const, error: "Không tìm thấy ảnh." };
+    if (size > MAX_PHOTO_BYTES) return { status: 422 as const, error: "Ảnh vượt quá 60 MB." };
+    const quota = await quotaError(tx, studioId, planId, Math.max(0, size - Number(old.size)));
+    if (quota) return { status: 422 as const, error: quota };
+    const [photo] = await tx`
+      update photos set storage_key = ${key}, preview_key = ${previewKey}, thumb_key = ${thumbKey},
+        unsplash = null, width = ${width}, height = ${height}, size = ${size}
+      where id = ${photoId}
+      returning ${tx.unsafe(PHOTO_COLUMNS)}`;
+    await tx`update albums set updated_at = now() where id = ${albumId}`;
+    return { photo: toPhoto(photo as PhotoRow), old: [old.storageKey || "", old.previewKey || "", old.thumbKey || ""] };
+  });
+  if ("error" in result) {
+    await deleteObjects(uploaded);
+    return c.json({ error: result.error }, result.status);
+  }
+  await deleteObjects(result.old.filter((value) => value && !uploaded.includes(value)));
+  return c.json({ photo: result.photo });
 });
 
 albumRoutes.post("/uploads/cover", async (c) => {

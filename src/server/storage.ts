@@ -4,9 +4,9 @@ import { AwsClient } from "aws4fetch";
 import { sign, safeEqual } from "./crypto";
 import { env } from "./env";
 
-// Every object key starts with studios/<studioId>/, so one studio can never be handed a
-// signed URL inside another studio's prefix.
-const KEY_RE = /^studios\/[A-Za-z0-9_-]+\/[A-Za-z0-9_\/.-]+$/;
+// Every object key starts with studios/<studioId>/ (album files) or users/<userId>/ (profile
+// photos), so a studio or account can never be handed a signed URL inside another's prefix.
+const KEY_RE = /^(studios|users)\/[A-Za-z0-9_-]+\/[A-Za-z0-9_\/.-]+$/;
 const UPLOAD_TTL = 15 * 60;
 
 export const MAX_PHOTO_BYTES = 60 * 1024 * 1024;

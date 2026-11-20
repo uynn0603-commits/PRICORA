@@ -19,7 +19,8 @@ export async function reseed({ keepSession }: { keepSession?: string } = {}) {
       : [];
     const files = await tx<Array<{ key: string }>>`
       select unnest(array[storage_key, preview_key, thumb_key]) as key from photos where storage_key is not null
-      union all select cover_key from albums where cover_key <> ''`;
+      union all select cover_key from albums where cover_key <> ''
+      union all select avatar_key from users where avatar_key <> ''`;
 
     await tx`delete from album_selections`;
     await tx`delete from photos`;
@@ -83,6 +84,8 @@ export async function reseed({ keepSession }: { keepSession?: string } = {}) {
           studio_id: album.studioId,
           photo_ids: album.selection!.photoIds,
           note: album.selection!.note,
+          photo_notes: tx.json(album.selection!.photoNotes || {}),
+          photo_edits: tx.json({}),
           submitted_at: album.selection!.submittedAt,
         })),
       )}`;

@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import { AlbumNotFound } from "@/components/albums/AlbumNotFound";
+import { EditDoneDialog } from "@/components/albums/EditDoneDialog";
 import { PhotoCard } from "@/components/albums/PhotoCard";
-import { SelectionPanel } from "@/components/albums/SelectionPanel";
+import { SelectionPanel, type SelectionFilter } from "@/components/albums/SelectionPanel";
 import { UploadZone, type UploadItem } from "@/components/albums/UploadZone";
 import { openLightbox } from "@/components/gallery/PhotoLightbox";
 import { Icon } from "@/components/ui/Icon";
@@ -21,11 +22,14 @@ import {
   refreshSelection,
   reorderPhotos,
   setCover,
+  setMobileCover,
   sortPhotos,
+  undoEditDone,
   uploadsInFlight,
   type SortMode,
   type UploadEntry,
 } from "@/lib/store";
+import { editDone } from "@/lib/types";
 import { ui } from "@/lib/ui";
 import { useStore, useTitle } from "@/lib/use-store";
 
@@ -38,13 +42,15 @@ export default function PhotosPage() {
   useTitle(`${album?.name || "Ảnh"} · PICORA`);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [queue, setQueue] = useState<UploadItem[]>([]);
-  const pickedParam = useSearchParams().get("picked") === "1";
-  const [onlyPicked, setOnlyPicked] = useState(pickedParam);
+  const pickedParam = useSearchParams().get("picked");
+  const filterParam: SelectionFilter = pickedParam === "edit" ? "edit" : pickedParam ? "favorite" : "";
+  const [selectionFilter, setSelectionFilter] = useState<SelectionFilter>(filterParam);
+  const [editing, setEditing] = useState<string | null>(null);
   const files = useRef(new Map<string, File>());
 
   useEffect(() => {
-    if (pickedParam) setOnlyPicked(true);
-  }, [pickedParam]);
+    if (filterParam) setSelectionFilter(filterParam);
+  }, [filterParam]);
 
   useEffect(() => {
     void refreshSelection(id);
@@ -78,8 +84,16 @@ export default function PhotosPage() {
   if (!album) return <AlbumNotFound />;
   const albumId = album.id;
   const pickedIds = new Set(album.selection?.photoIds || []);
-  const filtering = onlyPicked && pickedIds.size > 0;
-  const visible = filtering ? album.photos.filter((photo) => pickedIds.has(photo.id)) : album.photos;
+  const requests = album.selection?.photoNotes || {};
+  const undoEdit = async (photoId: string) => {
+    const result = await undoEditDone(albumId, photoId);
+    if (!result.ok) toast(result.error, "error");
+    else toast("Đã chuyển ảnh về “Cần sửa”");
+  };
+  const filtering = selectionFilter !== "" && Boolean(album.selection);
+  const visible = !filtering
+    ? album.photos
+    : album.photos.filter((photo) => (selectionFilter === "edit" ? Boolean(requests[photo.id]) : pickedIds.has(photo.id)));
 
   const upload = (entries: UploadEntry[]) =>
     addPhotos(albumId, entries, (event) => {
@@ -148,6 +162,14 @@ export default function PhotosPage() {
     toast("Đã cập nhật ảnh bìa");
   };
 
+  const toggleMobileCover = () => {
+    const photoId = [...selected][0];
+    if (!photoId) return;
+    const clearing = album.mobileCoverId === photoId;
+    setMobileCover(albumId, clearing ? "" : photoId);
+    toast(clearing ? "Điện thoại sẽ dùng ảnh bìa chính" : "Đã đặt ảnh bìa cho điện thoại");
+  };
+
   const onDragStart = (photoId: string, event: DragEvent<HTMLButtonElement>) => {
     dragId.current = photoId;
     event.dataTransfer.effectAllowed = "move";
@@ -197,7 +219,7 @@ export default function PhotosPage() {
           setQueue([]);
         }}
       />
-      <SelectionPanel album={album} filtered={filtering} onFilter={setOnlyPicked} />
+      <SelectionPanel album={album} filter={filtering ? selectionFilter : ""} onFilter={setSelectionFilter} />
       <div className="z-20 -mx-4 mt-4 lg:sticky lg:top-16 border-y border-line bg-canvas/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6 xl:-mx-8 xl:px-8">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2">
@@ -215,6 +237,16 @@ export default function PhotosPage() {
             <span className="hidden h-6 w-px bg-line sm:block" />
             <button type="button" onClick={setSelectedCover} className={ui.secondary} disabled={!one}>
               <Icon name="image" className="h-4 w-4" /> Đặt làm ảnh bìa
+            </button>
+            <button
+              type="button"
+              onClick={toggleMobileCover}
+              className={ui.secondary}
+              disabled={!one}
+              title="Ảnh bìa hiển thị khi khách mở album trên điện thoại, nên chọn ảnh dọc"
+            >
+              <Icon name="smartphone" className="h-4 w-4" />
+              {one && album.mobileCoverId === [...selected][0] ? "Bỏ bìa điện thoại" : "Bìa điện thoại"}
             </button>
             <span className="inline-flex">
               <button
@@ -275,6 +307,10 @@ export default function PhotosPage() {
                 album={album}
                 selected={selected.has(photo.id)}
                 picked={pickedIds.has(photo.id)}
+                request={requests[photo.id]}
+                edit={editDone(album.selection?.photoEdits, photo.id, requests[photo.id])}
+                onEdit={setEditing}
+                onUndoEdit={undoEdit}
                 sortable={!filtering}
                 onToggle={toggle}
                 onPreview={preview}
@@ -290,6 +326,7 @@ export default function PhotosPage() {
           </div>
         )}
       </div>
+      {editing ? <EditDoneDialog album={album} photoId={editing} onClose={() => setEditing(null)} /> : null}
     </div>
   );
 }

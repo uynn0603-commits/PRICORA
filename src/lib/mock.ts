@@ -112,6 +112,8 @@ interface AlbumSeed {
   // Photo positions the demo customer has already sent back.
   picked?: number[];
   pickedNote?: string;
+  // Retouch requests keyed by photo position.
+  pickedNotes?: Record<number, string>;
 }
 
 function makeAlbum(config: AlbumSeed): Album {
@@ -128,6 +130,7 @@ function makeAlbum(config: AlbumSeed): Album {
     shootingDate: toISODate(created),
     description: config.description,
     coverId: photos[0]?.id || "",
+    mobileCoverId: "",
     coverDataUrl: "",
     coverSession: false,
     password: config.password || "",
@@ -139,7 +142,17 @@ function makeAlbum(config: AlbumSeed): Album {
     selectionLimit: config.selectionLimit || 0,
     selectionLocked: false,
     selection: config.picked
-      ? { photoIds: config.picked.map((index) => photos[index]?.id).filter(Boolean), note: config.pickedNote || "", submittedAt: monthDate(config.month, config.day + 3).toISOString() }
+      ? {
+          photoIds: config.picked.map((index) => photos[index]?.id).filter(Boolean),
+          note: config.pickedNote || "",
+          photoNotes: Object.fromEntries(
+            Object.entries(config.pickedNotes || {})
+              .filter(([index]) => photos[Number(index)])
+              .map(([index, text]) => [photos[Number(index)].id, text]),
+          ),
+          photoEdits: {},
+          submittedAt: monthDate(config.month, config.day + 3).toISOString(),
+        }
       : null,
     createdAt: created.toISOString(),
     updatedAt: created.toISOString(),
@@ -317,6 +330,11 @@ export function createSeed(): Database {
         selectionLimit: 30,
         picked: [0, 3, 5, 8, 12, 15, 19, 22, 27, 31, 36, 40, 44, 51, 58, 63, 70, 77],
         pickedNote: "Em muốn chỉnh da nhẹ và làm sáng các ảnh ở hồ nước ạ.",
+        pickedNotes: {
+          3: "Xóa giúp em người đi phía sau.",
+          12: "Làm sáng mặt, ảnh này em in khổ 60×90.",
+          31: "Chỉnh váy cho phẳng, bỏ nếp nhăn.",
+        },
       }),
       makeAlbum({
         id: "alb_tuan_anh",

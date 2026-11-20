@@ -2,7 +2,7 @@ import { api, ApiError, errorMessage, uploadFile, withRetry } from "./api";
 import { studioSettings } from "./mock";
 import { getPlanById } from "./plans";
 import { isTemplateId } from "./catalog";
-import { makeVariants } from "./media";
+import { makeVariants, squareJpeg } from "./media";
 import { daysUntil, parseISODate, toISODate } from "./format";
 import { toast } from "./overlay";
 import type {
@@ -234,13 +234,41 @@ export function updateSettings(patch: Partial<StudioSettings>): StudioSettings |
 export async function updateAccount(input: { name: string; email: string; currentPassword: string; newPassword: string }): Promise<Outcome> {
   try {
     const { user } = await api<{ user: User }>("/account", { method: "PATCH", body: input });
-    state.user = user;
-    state.members = state.members.map((member) => (member.userId === user.id ? { ...member, user } : member));
-    emit();
+    setUser(user);
     return { ok: true };
   } catch (error) {
     const code = (error as { data?: { code?: string } }).data?.code;
     return { ok: false, error: code === "email" || code === "current" ? code : errorMessage(error) };
+  }
+}
+
+function setUser(user: User) {
+  state.user = user;
+  state.members = state.members.map((member) => (member.userId === user.id ? { ...member, user } : member));
+  emit();
+}
+
+export async function changeAvatar(file: File): Promise<Outcome> {
+  const photo = await squareJpeg(file);
+  if (!photo) return { ok: false, error: "Không đọc được ảnh này. Hãy chọn ảnh JPG, PNG hoặc WEBP." };
+  try {
+    const intent = await api<{ key: string; uploadUrl: string }>("/account/avatar/upload", { body: {} });
+    await withRetry(() => uploadFile(intent.uploadUrl, photo));
+    const { user } = await api<{ user: User }>("/account/avatar", { method: "PUT", body: { key: intent.key } });
+    setUser(user);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error, "Chưa đổi được ảnh đại diện. Vui lòng thử lại.") };
+  }
+}
+
+export async function removeAvatar(): Promise<Outcome> {
+  try {
+    const { user } = await api<{ user: User }>("/account/avatar", { method: "PUT", body: { key: "" } });
+    setUser(user);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
   }
 }
 
@@ -357,6 +385,7 @@ const ALBUM_FIELDS = [
   "templateId",
   "allowDownload",
   "coverId",
+  "mobileCoverId",
   "coverKey",
 ] as const;
 
@@ -498,23 +527,29 @@ export async function loadPublicGallery(studioSlug: string, albumSlug: string): 
     });
     galleries.set(key, result);
   } catch {
+    // A failed background refresh keeps showing the album already on screen.
+    if (galleries.has(key)) return;
     galleries.set(key, { state: "invalid", admin: false, studio: null, album: null });
   }
   emit();
 }
 
-export async function submitSelection(studioSlug: string, albumSlug: string, photoIds: string[], note: string): Promise<Outcome> {
+export async function submitSelection(
+  studioSlug: string,
+  albumSlug: string,
+  picks: Pick<AlbumSelection, "photoIds" | "note" | "photoNotes">,
+): Promise<Outcome<{ selection: AlbumSelection }>> {
   const key = galleryKey(studioSlug, albumSlug);
   const token = albumTokens()[key];
   try {
     const { selection } = await api<{ selection: AlbumSelection }>(
       `/public/${encodeURIComponent(studioSlug)}/${encodeURIComponent(albumSlug)}/selection`,
-      { method: "PUT", body: { photoIds, note }, headers: token ? { "x-album-token": token } : {} },
+      { method: "PUT", body: picks, headers: token ? { "x-album-token": token } : {} },
     );
     const gallery = galleries.get(key);
     if (gallery?.album) gallery.album.selection = selection;
     emit();
-    return { ok: true };
+    return { ok: true, selection };
   } catch (error) {
     if (error instanceof ApiError && error.status === 423) await loadPublicGallery(studioSlug, albumSlug);
     return { ok: false, error: errorMessage(error, "Chưa gửi được lựa chọn. Vui lòng thử lại.") };
@@ -685,6 +720,73 @@ export async function addPhotos(albumId: string, entries: UploadEntry[], onItem?
   );
 }
 
+// Puts a new file (usually the retouched version) behind an existing photo.
+export async function replacePhotoFile(albumId: string, photoId: string, file: File, onProgress?: (value: number) => void): Promise<Outcome> {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  if (!ACCEPTED_EXT.has(ext) || (file.type && !ACCEPTED_TYPES.has(file.type))) return { ok: false, error: "Chỉ chấp nhận tệp JPG, PNG hoặc WEBP." };
+  const variants = await makeVariants(file);
+  if (!variants) return { ok: false, error: "Tệp này không phải ảnh hợp lệ." };
+  const path = `/albums/${encodeURIComponent(albumId)}/photos/${encodeURIComponent(photoId)}`;
+  try {
+    const intent = await withRetry(() =>
+      api<UploadIntent & { revision: string }>(`${path}/replace`, { body: { name: file.name, type: file.type, size: file.size } }),
+    );
+    await withRetry(() => uploadFile(intent.uploadUrl, file, (value) => onProgress?.(value * 0.9)));
+    const sent: Partial<Record<"preview" | "thumb", string>> = {};
+    for (const name of ["preview", "thumb"] as const) {
+      const blob = variants[name];
+      if (!blob) continue;
+      try {
+        await withRetry(() => uploadFile(intent.variants[name].uploadUrl, blob));
+        sent[name] = intent.variants[name].key;
+      } catch {
+        // The gallery falls back to the original.
+      }
+    }
+    const { photo } = await withRetry(() =>
+      api<{ photo: Photo }>(`${path}/file`, {
+        method: "PUT",
+        body: { revision: intent.revision, key: intent.key, previewKey: sent.preview, thumbKey: sent.thumb, w: variants.w, h: variants.h },
+      }),
+    );
+    const album = getAlbum(albumId);
+    if (album) {
+      album.photos = album.photos.map((item) => (item.id === photo.id ? photo : item));
+      album.updatedAt = now();
+      emit();
+    }
+    onProgress?.(1);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error, "Không tải được ảnh đã sửa lên.") };
+  }
+}
+
+export async function markEditDone(albumId: string, photoId: string, reply: string, replaced: boolean): Promise<Outcome> {
+  return editRequest(albumId, photoId, "PUT", { reply, replaced });
+}
+
+export async function undoEditDone(albumId: string, photoId: string): Promise<Outcome> {
+  return editRequest(albumId, photoId, "DELETE");
+}
+
+async function editRequest(albumId: string, photoId: string, method: "PUT" | "DELETE", body?: object): Promise<Outcome> {
+  try {
+    const { selection } = await api<{ selection: AlbumSelection }>(
+      `/albums/${encodeURIComponent(albumId)}/selection/edits/${encodeURIComponent(photoId)}`,
+      { method, body },
+    );
+    const album = getAlbum(albumId);
+    if (album) {
+      album.selection = selection;
+      emit();
+    }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
 export async function uploadCover(file: File): Promise<string> {
   const intent = await api<{ key: string; uploadUrl: string }>("/uploads/cover", { body: { name: file.name, type: file.type, size: file.size } });
   await uploadFile(intent.uploadUrl, file);
@@ -704,6 +806,7 @@ export function deletePhotos(albumId: string, ids: string[]) {
   const remove = new Set(ids);
   album.photos = album.photos.filter((photo) => !remove.has(photo.id));
   if (remove.has(album.coverId)) album.coverId = album.photos[0]?.id || "";
+  if (remove.has(album.mobileCoverId)) album.mobileCoverId = "";
   album.updatedAt = now();
   emit();
   sync(() => api(`/albums/${encodeURIComponent(albumId)}/photos/delete`, { body: { ids } }));
@@ -753,6 +856,11 @@ export function setAlbumTemplate(albumId: string, templateId: string): Album | n
 
 export function setCover(albumId: string, photoId: string) {
   updateAlbum(albumId, { coverId: photoId, coverDataUrl: "", coverSession: false, coverKey: "" });
+}
+
+// Empty `photoId` goes back to using the main cover on phones.
+export function setMobileCover(albumId: string, photoId: string) {
+  updateAlbum(albumId, { mobileCoverId: photoId });
 }
 
 /* ---------- Studio statistics ---------- */
@@ -865,11 +973,14 @@ export function getNotifications(): Notification[] {
     .filter((album) => album.selection)
     .sort((a, b) => b.selection!.submittedAt.localeCompare(a.selection!.submittedAt))
     .forEach((album) => {
+      const favorites = album.selection!.photoIds.length;
+      const requests = Object.keys(album.selection!.photoNotes || {}).length;
+      const parts = [favorites ? `${favorites} ảnh yêu thích` : "", requests ? `${requests} ảnh cần sửa` : ""].filter(Boolean);
       items.push({
         id: `${studioId}:sel-${album.id}-${album.selection!.submittedAt}`,
-        title: `${album.customerName || album.name} đã chọn ${album.selection!.photoIds.length} ảnh`,
+        title: `${album.customerName || album.name} đã gửi ${parts.join(", ")}`,
         meta: album.selectionLocked ? "Lựa chọn của khách · đã chốt" : "Lựa chọn của khách",
-        href: `/admin/albums/${album.id}/photos?picked=1`,
+        href: `/admin/albums/${album.id}/photos?picked=${favorites ? "favorite" : "edit"}`,
       });
     });
   const storage = storageStats();

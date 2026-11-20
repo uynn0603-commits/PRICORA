@@ -6,7 +6,7 @@ import { formatDate } from "@/lib/format";
 import { photoSrc } from "@/lib/media";
 import { GalleryRoot, ScrollLink, useGallery } from "../gallery/GalleryActions";
 import { GalleryFooter } from "../gallery/GalleryFooter";
-import { fitsWide, Frame } from "../gallery/GalleryGrid";
+import { fitsWide, Frame, ownRatio, ownWidth } from "../gallery/GalleryGrid";
 import { albumMeta, DownloadAllButton } from "../gallery/GalleryHeader";
 import { CoverImage } from "../gallery/GalleryHero";
 import { pad, type GalleryModel } from "../gallery/model";
@@ -71,8 +71,8 @@ const SPREADS: Array<{ size: number; render: (model: GalleryModel, i: number) =>
           </div>
         </figure>
       ) : (
-        <figure className="mx-auto w-full max-w-[560px]">
-          <Frame index={i} ratio={4 / 5} width={1200} sizes="(min-width: 640px) 560px, 100vw" className={TILE} imgClass={IMG} />
+        <figure className="mx-auto w-full" style={{ maxWidth: ownWidth(model.photos[i], 560) }}>
+          <Frame index={i} ratio={ownRatio(model.photos[i])} width={1200} sizes="(min-width: 640px) 560px, 100vw" className={TILE} imgClass={IMG} />
           <Caption model={model} index={i} />
         </figure>
       ),
@@ -109,7 +109,7 @@ const SPREADS: Array<{ size: number; render: (model: GalleryModel, i: number) =>
           </figure>
         ) : (
           <figure className="md:col-span-5 md:col-start-7">
-            <Frame index={i} ratio={4 / 5} width={1200} sizes="(min-width: 768px) 40vw, 100vw" className={TILE} imgClass={IMG} />
+            <Frame index={i} ratio={ownRatio(model.photos[i])} width={1200} sizes="(min-width: 768px) 40vw, 100vw" className={TILE} imgClass={IMG} />
           </figure>
         )}
       </div>

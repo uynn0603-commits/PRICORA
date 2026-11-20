@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { currentStudio, getPlan, getSession, studiosForUser } from "@/lib/store";
-import { cn, initials } from "@/lib/format";
+import { cn } from "@/lib/format";
 import { Icon } from "../ui/Icon";
+import { UserAvatar } from "../ui/UserAvatar";
 import { LogoLockup, StudioMark } from "../ui/Logo";
 
 const ITEMS = [
@@ -75,7 +76,7 @@ export function Sidebar({
         </nav>
         <div className="border-t border-line p-3">
           <Link href="/admin/settings?tab=account" onClick={onClose} className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-canvas">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-white">{initials(session?.name || "")}</span>
+            <UserAvatar user={session?.user} />
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold">{session?.name || ""}</span>
               <span className="block truncate text-xs text-mist">{session?.email || ""}</span>

@@ -8,7 +8,7 @@ import { ui } from "@/lib/ui";
 import { lightboxPhotos, type GalleryModel } from "./model";
 import { openLightbox } from "./PhotoLightbox";
 import { SelectionBar } from "./SelectionBar";
-import { startSelection, stopSelection } from "./selection";
+import { refreshSubmitted, startSelection, stopSelection } from "./selection";
 
 interface GalleryActions {
   model: GalleryModel;
@@ -75,6 +75,12 @@ export function GalleryRoot({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model.id, model.slug, photoKey, Boolean(selection), selection?.limit, selection?.locked, selection?.preview, selection?.submitted?.submittedAt]);
 
+  const editsKey = JSON.stringify(selection?.submitted?.photoEdits || {});
+  useEffect(() => {
+    refreshSubmitted(model.id, selection?.submitted || null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model.id, editsKey]);
+
   const lightboxOptions = { theme: lightbox, allowDownload: model.settings.allowDownload, selectable: Boolean(selection) };
   // `index` points into `model.photos`; the lightbox walks every photo, cover included.
   const open = (index: number) => {
@@ -120,7 +126,7 @@ export function GalleryRoot({
     <GalleryContext.Provider value={{ model, open, downloadAll }}>
       <div id="template-root" className={className}>
         {children}
-        {selection ? <SelectionBar onReview={review} /> : null}
+        {selection ? <SelectionBar photos={model.allPhotos} onReview={review} /> : null}
       </div>
       {progress &&
         createPortal(
