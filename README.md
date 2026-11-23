@@ -50,7 +50,7 @@ npm start
 | `APP_TIMEZONE` | Múi giờ tính ngày hết hạn album, mặc định `Asia/Ho_Chi_Minh`. |
 | `STORAGE_DRIVER` | `local` (ổ đĩa) hoặc `s3` (R2 / S3). |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Thông tin bucket khi `STORAGE_DRIVER=s3`. Với R2: endpoint `https://<account>.r2.cloudflarestorage.com`, region `auto`. |
-| `MEDIA_PUBLIC_URL` | Domain public của bucket (custom domain hoặc `r2.dev`), không có `/` ở cuối. |
+| `MEDIA_PUBLIC_URL` | Domain public của bucket (custom domain hoặc `r2.dev`), không có `/` ở cuối. **Để trống** nếu bucket là private (xem mục B2 bên dưới). |
 | `ALLOW_DEMO_RESET` | `true` để bật nút **Khôi phục dữ liệu demo**. Production nên để `false`. |
 
 ### Deploy lên Vercel + Neon + R2
@@ -63,6 +63,42 @@ npm start
 3. **Vercel:** import repo, preset **Next.js**. Khai báo `DATABASE_URL`, `SESSION_SECRET`, `STORAGE_DRIVER=s3`, các biến `S3_*`, `MEDIA_PUBLIC_URL`, `ALLOW_DEMO_RESET=false`. Không cần khai báo `MIGRATION_DATABASE_URL` trên Vercel.
 
 Ảnh đi thẳng từ trình duyệt lên R2 bằng presigned URL, nên giới hạn kích thước request của Vercel không ảnh hưởng tới upload.
+
+CORS cũng có thể cài bằng script (chạy được cho cả R2 và B2), truyền các domain của app:
+
+```bash
+S3_ENDPOINT=... S3_REGION=... S3_BUCKET=... S3_ACCESS_KEY_ID=... S3_SECRET_ACCESS_KEY=... \
+npm run storage:cors -- https://<domain-của-bạn>
+```
+
+### Lưu ảnh tạm trên Backblaze B2 (giai đoạn dùng thử)
+
+B2 cho tạo bucket **Private** miễn phí không cần thẻ (bucket Public đòi thẻ). Khi `STORAGE_DRIVER=s3` và `MEDIA_PUBLIC_URL` để trống, app coi bucket là private: mọi ảnh có địa chỉ `/api/media/file/<key>`, server trả về redirect tới link B2 đã ký. Link giữ nguyên trong mỗi khung 6 giờ nên trình duyệt và CDN của Vercel cache được. Upload vẫn đi thẳng từ trình duyệt lên B2.
+
+1. Tạo bucket **Private**, Lifecycle **Keep only the last version of the file**. Tạo Application Key chỉ cho bucket đó, quyền Read and Write.
+2. Biến môi trường trên Vercel (ví dụ vùng `us-west-004`, lấy đúng mã vùng trong Endpoint của bucket):
+   ```
+   STORAGE_DRIVER=s3
+   S3_ENDPOINT=https://s3.us-west-004.backblazeb2.com
+   S3_REGION=us-west-004
+   S3_BUCKET=<tên bucket>
+   S3_ACCESS_KEY_ID=<keyID>
+   S3_SECRET_ACCESS_KEY=<applicationKey>
+   MEDIA_PUBLIC_URL=
+   ```
+   `S3_REGION` phải đúng mã vùng, không dùng `auto` như R2.
+3. Cài CORS bằng `npm run storage:cors -- https://<domain-của-bạn>` (giao diện web của B2 không cho cấu hình `PUT`).
+
+Giới hạn miễn phí khi chưa có thẻ: 10GB lưu trữ, khoảng 1GB tải xuống và 2.500 lượt đọc file mỗi ngày (reset 0h UTC). Vượt giới hạn thì ảnh tạm không tải được tới hôm sau, dữ liệu không mất. Nên tắt **Cho phép tải ảnh** ở album trong giai đoạn này.
+
+### Chuyển từ B2 sang R2
+
+Database chỉ lưu key tương đối (`studios/...`, `users/...`), không lưu domain, nên chuyển kho ảnh không cần sửa dữ liệu hay code:
+
+1. Tạo bucket R2 public và API token như mục **Deploy** ở trên, cài CORS bằng `npm run storage:cors`.
+2. Copy toàn bộ file sang, giữ nguyên key, ví dụ bằng [rclone](https://rclone.org): cấu hình hai remote `b2` và `r2` (kiểu `s3`), rồi chạy `rclone copy b2:<bucket-b2> r2:<bucket-r2> --progress`.
+3. Trên Vercel đổi `S3_ENDPOINT`, `S3_REGION=auto`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` sang R2 và **điền** `MEDIA_PUBLIC_URL` (domain public của R2), rồi Redeploy. Ảnh lúc này tải thẳng từ R2, không qua `/api/media/file` nữa.
+4. Chạy lại `rclone copy` một lần sau khi redeploy để lấy nốt ảnh upload trong lúc chuyển, kiểm tra vài album rồi mới xoá bucket B2.
 
 ### Cấu trúc
 

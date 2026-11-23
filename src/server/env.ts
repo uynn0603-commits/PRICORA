@@ -26,8 +26,10 @@ export const env = {
       secretAccessKey: required("S3_SECRET_ACCESS_KEY"),
     };
   },
+  // Empty means the bucket is private (e.g. Backblaze B2 without billing): photos are served
+  // through /api/media/file, which redirects to a short-lived signed URL.
   get mediaPublicUrl() {
-    return required("MEDIA_PUBLIC_URL").replace(/\/+$/, "");
+    return (process.env.MEDIA_PUBLIC_URL || "").replace(/\/+$/, "");
   },
   get allowDemoReset() {
     return process.env.ALLOW_DEMO_RESET === "true";

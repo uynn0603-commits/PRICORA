@@ -138,8 +138,27 @@ export async function deleteObjects(keys: string[]) {
   await Promise.allSettled(valid.map((key) => client.fetch(s3Url(key), { method: "DELETE" })));
 }
 
+export function isPrivateBucket(): boolean {
+  return env.storageDriver === "s3" && !env.mediaPublicUrl;
+}
+
 export function publicUrl(key: string): string {
   if (!key) return "";
-  if (env.storageDriver === "local") return `/api/media/file/${key}`;
+  if (env.storageDriver === "local" || isPrivateBucket()) return `/api/media/file/${key}`;
   return `${env.mediaPublicUrl}/${key}`;
+}
+
+const DOWNLOAD_WINDOW = 6 * 60 * 60;
+
+// Signing against the start of a fixed window keeps a photo's URL identical for the whole
+// window, so browsers and the CDN reuse the cached copy instead of downloading it again.
+export async function signedDownload(key: string): Promise<{ url: string; maxAge: number } | null> {
+  if (!isPrivateBucket() || !isValidKey(key)) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const start = now - (now % DOWNLOAD_WINDOW);
+  const url = new URL(s3Url(key));
+  url.searchParams.set("X-Amz-Expires", String(DOWNLOAD_WINDOW * 2));
+  const datetime = new Date(start * 1000).toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const signed = await s3Client().sign(new Request(url), { aws: { signQuery: true, datetime } });
+  return { url: signed.url, maxAge: start + DOWNLOAD_WINDOW - now };
 }

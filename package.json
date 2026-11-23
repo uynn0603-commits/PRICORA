@@ -12,7 +12,8 @@
     "db:up": "docker compose up -d",
     "db:migrate": "tsx --env-file=.env.local scripts/migrate.ts",
     "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
-    "db:setup": "npm run db:migrate && npm run db:seed"
+    "db:setup": "npm run db:migrate && npm run db:seed",
+    "storage:cors": "tsx scripts/storage-cors.ts"
   },
   "dependencies": {
     "aws4fetch": "^1.0.20",
