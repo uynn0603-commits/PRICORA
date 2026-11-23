@@ -20,8 +20,10 @@ export async function reseed({ keepSession }: { keepSession?: string } = {}) {
     const files = await tx<Array<{ key: string }>>`
       select unnest(array[storage_key, preview_key, thumb_key]) as key from photos where storage_key is not null
       union all select cover_key from albums where cover_key <> ''
-      union all select avatar_key from users where avatar_key <> ''`;
+      union all select avatar_key from users where avatar_key <> ''
+      union all select receipt_key from payment_requests where receipt_key <> ''`;
 
+    await tx`delete from payment_requests`;
     await tx`delete from album_selections`;
     await tx`delete from photos`;
     await tx`delete from albums`;
@@ -45,6 +47,7 @@ export async function reseed({ keepSession }: { keepSession?: string } = {}) {
         slug: studio.slug,
         name: studio.name,
         plan_id: studio.planId,
+        plan_expires_at: studio.planExpiresAt,
         status: studio.status,
         settings: tx.json(studio.settings),
         created_at: studio.createdAt,

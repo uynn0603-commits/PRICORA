@@ -5,7 +5,7 @@ import type { Role } from "@/lib/types";
 import { endSessionCookie, requireUser, startSession, type AppEnv } from "../auth";
 import { hashPassword, newId, verifyPassword } from "../crypto";
 import { asStudio, asSystem } from "../db";
-import { listAlbums, listMembers, STUDIO_COLUMNS, toStudio, type StudioRow } from "../data";
+import { getPendingStudioPayment, listAlbums, listMembers, STUDIO_COLUMNS, toStudio, type StudioRow } from "../data";
 import { EMAIL_RE, emailTaken, slugify, str, studioSlugError } from "../rules";
 import { deleteObjects, isImageObject, isValidKey, objectSize, presignUpload, publicUrl } from "../storage";
 
@@ -103,8 +103,12 @@ authRoutes.get("/bootstrap", async (c) => {
   const current = auth.studio;
   const scoped =
     current && current.status === "active"
-      ? await asStudio(current.id, async (tx) => ({ members: await listMembers(tx, current.id), albums: await listAlbums(tx, current.id) }))
-      : { members: [], albums: [] };
+      ? await asStudio(current.id, async (tx) => ({
+          members: await listMembers(tx, current.id),
+          albums: await listAlbums(tx, current.id),
+          pendingPayment: await getPendingStudioPayment(tx, current.id),
+        }))
+      : { members: [], albums: [], pendingPayment: null };
   return c.json({
     session: { userId: auth.user.id, studioId: auth.studioId, role: auth.role || "platform" },
     user: auth.user,

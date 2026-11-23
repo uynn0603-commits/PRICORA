@@ -16,7 +16,7 @@ export interface Auth {
   user: User;
   studioId: string | null;
   role: Role | null;
-  studio: { id: string; status: StudioStatus; planId: string } | null;
+  studio: { id: string; status: StudioStatus; planId: string; planExpiresAt: string | null; planExpired: boolean } | null;
 }
 
 export type AppEnv = { Variables: { auth: Auth | null } };
@@ -46,6 +46,7 @@ interface SessionRow extends UserRow {
   role: Role | null;
   studioStatus: StudioStatus | null;
   planId: string | null;
+  planExpiresAt: Date | null;
 }
 
 // A session is only valid while its user still belongs to the session's studio;
@@ -56,7 +57,7 @@ export const loadAuth: MiddlewareHandler<AppEnv> = createMiddleware<AppEnv>(asyn
   if (token) {
     const [row] = await asSystem((tx) => tx<SessionRow[]>`
       select s.token_hash, s.studio_id, u.id, u.name, u.email, u.platform_admin, u.avatar_key, m.role,
-        st.status as studio_status, st.plan_id
+        st.status as studio_status, st.plan_id, st.plan_expires_at
       from sessions s
       join users u on u.id = s.user_id
       left join memberships m on m.user_id = s.user_id and m.studio_id = s.studio_id
@@ -64,12 +65,14 @@ export const loadAuth: MiddlewareHandler<AppEnv> = createMiddleware<AppEnv>(asyn
       where s.token_hash = ${sha256(token)} and s.expires_at > now()`);
     const valid = row && (row.studioId ? Boolean(row.role) : row.platformAdmin);
     if (valid) {
+      const planExpiresAt = row.planExpiresAt ? row.planExpiresAt.toISOString() : null;
+      const planExpired = Boolean(row.planId && row.planId !== "free" && row.planExpiresAt && row.planExpiresAt.getTime() <= Date.now());
       auth = {
         tokenHash: row.tokenHash,
         user: toUser(row),
         studioId: row.studioId,
         role: row.role,
-        studio: row.studioId ? { id: row.studioId, status: row.studioStatus!, planId: row.planId! } : null,
+        studio: row.studioId ? { id: row.studioId, status: row.studioStatus!, planId: row.planId!, planExpiresAt, planExpired } : null,
       };
     } else endSessionCookie(c);
   }
@@ -94,6 +97,16 @@ export const requireStudio = createMiddleware<AppEnv>(async (c, next) => {
 
 export const requireOwner = createMiddleware<AppEnv>(async (c, next) => {
   if (c.get("auth")?.role !== "owner") return c.json({ error: OWNER_ONLY }, 403);
+  await next();
+});
+
+export const requireActivePlan = createMiddleware<AppEnv>(async (c, next) => {
+  if (c.get("auth")?.studio?.planExpired) {
+    return c.json(
+      { error: "Gói dịch vụ đã hết hạn. Vui lòng gia hạn tại Cài đặt → Gói dịch vụ và chờ quản trị viên duyệt.", code: "plan_expired" },
+      402,
+    );
+  }
   await next();
 });
 

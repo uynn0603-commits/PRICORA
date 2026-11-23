@@ -92,9 +92,46 @@ export interface Studio {
   slug: string;
   name: string;
   planId: string;
+  planExpiresAt: string | null;
   status: StudioStatus;
   createdAt: string;
   settings: StudioSettings;
+}
+
+export type PaymentKind = "change" | "renew";
+export type PaymentStatus = "pending" | "approved" | "rejected";
+
+export interface PlatformBank {
+  bankId: string;
+  bankAccount: string;
+  accountName: string;
+  transferPrefix: string;
+  updatedAt?: string;
+}
+
+export interface PaymentRequest {
+  id: string;
+  studioId: string;
+  kind: PaymentKind;
+  targetPlanId: string;
+  amount: number;
+  transferCode: string;
+  receiptUrl: string;
+  note: string;
+  status: PaymentStatus;
+  adminNote: string;
+  reviewedAt: string | null;
+  appliedExpiresAt: string | null;
+  createdAt: string;
+}
+
+export interface PlatformPaymentRequest extends PaymentRequest {
+  studioName: string;
+  studioSlug: string;
+  currentPlanId: string;
+  currentPlanExpiresAt: string | null;
+  submitterName: string;
+  submitterEmail: string;
 }
 
 export interface User {

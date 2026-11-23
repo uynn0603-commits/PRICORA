@@ -2,15 +2,20 @@
 
 import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { PlatformBankTab } from "@/components/platform/PlatformBankTab";
+import { PlatformPaymentsTab } from "@/components/platform/PlatformPaymentsTab";
 import { Icon } from "@/components/ui/Icon";
 import { LogoLockup, StudioMark } from "@/components/ui/Logo";
+import { formatVNDate, isBankConfigured, isPlanExpired } from "@/lib/billing";
 import { cn, formatBytes, formatDate, slugify } from "@/lib/format";
 import { closeModal, confirmDialog, openModal, toast } from "@/lib/overlay";
 import { formatPrice, PLANS } from "@/lib/plans";
 import {
   clearSession,
   createStudio,
+  getPlatformBankConfig,
   getSession,
+  listPlatformPayments,
   listStudios,
   loadPlatform,
   platformLoaded,
@@ -231,6 +236,7 @@ export default function PlatformPage() {
   useTitle("Quản trị nền tảng · PICORA");
   const router = useRouter();
   const session = getSession();
+  const [tab, setTab] = useState<"studios" | "payments" | "bank">("studios");
   const blocked = !session ? "/login" : !session.user.platformAdmin ? "/admin" : null;
 
   useEffect(() => {
@@ -241,8 +247,11 @@ export default function PlatformPage() {
   if (blocked || !session || !platformLoaded()) return null;
 
   const rows = listStudios();
+  const payments = listPlatformPayments();
+  const bank = getPlatformBankConfig();
+  const pendingCount = payments.filter((item) => item.status === "pending").length;
   const active = rows.filter((row) => row.studio.status === "active");
-  const revenue = active.reduce((sum, row) => sum + row.plan.price, 0);
+  const revenue = active.filter((row) => !isPlanExpired(row.studio)).reduce((sum, row) => sum + row.plan.price, 0);
   const albums = rows.reduce((sum, row) => sum + row.usage.albums, 0);
   const storage = rows.reduce((sum, row) => sum + row.usage.storage, 0);
 
@@ -312,99 +321,167 @@ export default function PlatformPage() {
               </>
             }
           />
-          <Stat label="Album" icon="images" value={albums.toLocaleString("vi-VN")} />
-          <Stat label="Dung lượng đã dùng" icon="hard-drive" value={formatBytes(storage)} />
-          <Stat label="Doanh thu dự kiến" icon="credit-card" value={formatPrice(revenue)} />
+          <button type="button" onClick={() => setTab("payments")} className="text-left">
+            <Stat
+              label="Thanh toán chờ duyệt"
+              icon="receipt"
+              value={
+                <span className={pendingCount > 0 ? "text-amber-600" : ""}>
+                  {pendingCount.toLocaleString("vi-VN")}
+                  <span className="ml-1.5 text-sm font-normal text-mist">yêu cầu</span>
+                </span>
+              }
+            />
+          </button>
+          <Stat
+            label="Album & dung lượng"
+            icon="hard-drive"
+            value={
+              <>
+                {formatBytes(storage)} <span className="text-sm font-normal text-mist">· {albums.toLocaleString("vi-VN")} album</span>
+              </>
+            }
+          />
+          <Stat label="Doanh thu tháng" icon="credit-card" value={formatPrice(revenue)} />
         </section>
-        <section className={`${ui.card} mt-6 overflow-x-auto`}>
-          <table className="w-full min-w-[920px] text-left">
-            <thead className="border-b border-line text-xs font-semibold uppercase tracking-wider text-mist">
-              <tr>
-                <th className="px-5 py-3">Studio</th>
-                <th className="px-5 py-3">Chủ studio</th>
-                <th className="px-5 py-3">Gói</th>
-                <th className="px-5 py-3">Album</th>
-                <th className="px-5 py-3">Dung lượng</th>
-                <th className="px-5 py-3">Thành viên</th>
-                <th className="px-5 py-3">Trạng thái</th>
-                <th className="px-5 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {rows.map(({ studio, plan, usage, owner }) => {
-                const status = STATUS[studio.status] || STATUS.active;
-                const suspended = studio.status === "suspended";
-                return (
-                  <tr key={studio.id} className={suspended ? "bg-canvas/60" : ""}>
-                    <td className="px-5 py-4">
-                      <span className="flex items-center gap-3">
-                        <StudioMark studio={studio} size={36} />
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-semibold">{studio.name}</span>
-                          <span className="block truncate text-xs text-mist">
-                            /s/{studio.slug} · tạo {formatDate(studio.createdAt)}
-                          </span>
-                        </span>
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 text-sm">
-                      {owner ? (
-                        <>
-                          <span className="block font-medium">{owner.name}</span>
-                          <span className="block text-xs text-mist">{owner.email}</span>
-                        </>
-                      ) : (
-                        <span className="text-mist">Chưa có</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="relative block w-36">
-                        <select
-                          value={plan.id}
-                          onChange={(event) => changePlan(studio.id, event.target.value)}
-                          className="h-9 w-full appearance-none rounded-lg border border-line bg-white pl-3 pr-8 text-sm"
-                        >
-                          {PLANS.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.name}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-mist">
-                          <Icon name="chevron-down" className="h-3.5 w-3.5" />
-                        </span>
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 text-sm">
-                      {usage.albums}
-                      {plan.albums == null ? null : <span className="text-mist"> / {plan.albums}</span>}
-                    </td>
-                    <td className="px-5 py-4">
-                      <UsageCell used={usage.storage} limit={plan.storage} />
-                    </td>
-                    <td className="px-5 py-4 text-sm">
-                      {usage.members}
-                      <span className="text-mist"> / {plan.members}</span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${status.className}`}>{status.label}</span>
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => changeStatus(studio.id, studio.name, suspended ? "active" : "suspended")}
-                        className={cn(ui.ghost, !suspended && "hover:text-rose-600")}
-                      >
-                        <Icon name={suspended ? "circle-check" : "ban"} className="h-4 w-4" /> {suspended ? "Mở lại" : "Tạm khóa"}
-                      </button>
-                    </td>
+
+        <div className="mt-6 flex gap-5 overflow-x-auto border-b border-line">
+          <button
+            type="button"
+            onClick={() => setTab("studios")}
+            className={cn("inline-flex shrink-0 items-center gap-2 border-b-2 pb-3 text-sm font-semibold", tab === "studios" ? "border-primary text-ink" : "border-transparent text-mist hover:text-ink")}
+          >
+            <Icon name="building-2" className="h-4 w-4" /> Studio ({rows.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("payments")}
+            className={cn("inline-flex shrink-0 items-center gap-2 border-b-2 pb-3 text-sm font-semibold", tab === "payments" ? "border-primary text-ink" : "border-transparent text-mist hover:text-ink")}
+          >
+            <Icon name="receipt" className="h-4 w-4" /> Duyệt thanh toán
+            {pendingCount > 0 ? (
+              <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-semibold leading-none text-white">{pendingCount}</span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("bank")}
+            className={cn("inline-flex shrink-0 items-center gap-2 border-b-2 pb-3 text-sm font-semibold", tab === "bank" ? "border-primary text-ink" : "border-transparent text-mist hover:text-ink")}
+          >
+            <Icon name="landmark" className="h-4 w-4" /> Tài khoản nhận tiền
+            {!isBankConfigured(bank) ? <span className="h-2 w-2 rounded-full bg-amber-500" title="Chưa cấu hình tài khoản ngân hàng" /> : null}
+          </button>
+        </div>
+
+        {tab === "studios" ? (
+          <>
+            <section className={`${ui.card} mt-6 overflow-x-auto`}>
+              <table className="w-full min-w-[980px] text-left">
+                <thead className="border-b border-line text-xs font-semibold uppercase tracking-wider text-mist">
+                  <tr>
+                    <th className="px-5 py-3">Studio</th>
+                    <th className="px-5 py-3">Chủ studio</th>
+                    <th className="px-5 py-3">Gói</th>
+                    <th className="px-5 py-3">Hạn gói</th>
+                    <th className="px-5 py-3">Album</th>
+                    <th className="px-5 py-3">Dung lượng</th>
+                    <th className="px-5 py-3">Thành viên</th>
+                    <th className="px-5 py-3">Trạng thái</th>
+                    <th className="px-5 py-3"></th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </section>
-        <p className="mt-4 text-xs text-mist">Doanh thu dự kiến tính theo giá gói của các studio đang hoạt động. Bản demo chưa tích hợp thanh toán.</p>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {rows.map(({ studio, plan, usage, owner }) => {
+                    const status = STATUS[studio.status] || STATUS.active;
+                    const suspended = studio.status === "suspended";
+                    const expired = isPlanExpired(studio);
+                    return (
+                      <tr key={studio.id} className={suspended ? "bg-canvas/60" : ""}>
+                        <td className="px-5 py-4">
+                          <span className="flex items-center gap-3">
+                            <StudioMark studio={studio} size={36} />
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-semibold">{studio.name}</span>
+                              <span className="block truncate text-xs text-mist">
+                                /s/{studio.slug} · tạo {formatDate(studio.createdAt)}
+                              </span>
+                            </span>
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-sm">
+                          {owner ? (
+                            <>
+                              <span className="block font-medium">{owner.name}</span>
+                              <span className="block text-xs text-mist">{owner.email}</span>
+                            </>
+                          ) : (
+                            <span className="text-mist">Chưa có</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="relative block w-36">
+                            <select
+                              value={plan.id}
+                              onChange={(event) => changePlan(studio.id, event.target.value)}
+                              className="h-9 w-full appearance-none rounded-lg border border-line bg-white pl-3 pr-8 text-sm"
+                            >
+                              {PLANS.map((item) => (
+                                <option key={item.id} value={item.id}>
+                                  {item.name}
+                                </option>
+                              ))}
+                            </select>
+                            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-mist">
+                              <Icon name="chevron-down" className="h-3.5 w-3.5" />
+                            </span>
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-4 text-sm">
+                          {plan.price === 0 ? (
+                            <span className="text-xs text-mist">Không giới hạn</span>
+                          ) : expired ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700">
+                              Hết hạn · {formatVNDate(studio.planExpiresAt)}
+                            </span>
+                          ) : (
+                            <span className="text-xs font-medium text-ink">Đến {formatVNDate(studio.planExpiresAt)}</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-4 text-sm">
+                          {usage.albums}
+                          {plan.albums == null ? null : <span className="text-mist"> / {plan.albums}</span>}
+                        </td>
+                        <td className="px-5 py-4">
+                          <UsageCell used={usage.storage} limit={plan.storage} />
+                        </td>
+                        <td className="px-5 py-4 text-sm">
+                          {usage.members}
+                          <span className="text-mist"> / {plan.members}</span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${status.className}`}>{status.label}</span>
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => changeStatus(studio.id, studio.name, suspended ? "active" : "suspended")}
+                            className={cn(ui.ghost, !suspended && "hover:text-rose-600")}
+                          >
+                            <Icon name={suspended ? "circle-check" : "ban"} className="h-4 w-4" /> {suspended ? "Mở lại" : "Tạm khóa"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </section>
+            <p className="mt-4 text-xs text-mist">Doanh thu tháng tính theo giá gói của các studio đang hoạt động và còn hạn gói.</p>
+          </>
+        ) : null}
+
+        {tab === "payments" ? <PlatformPaymentsTab requests={payments} /> : null}
+        {tab === "bank" ? <PlatformBankTab key={bank.updatedAt || "init"} initial={bank} /> : null}
       </main>
     </div>
   );

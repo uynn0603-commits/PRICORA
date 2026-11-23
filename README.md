@@ -12,9 +12,9 @@ Một repo, một lần deploy:
 - **Mỗi studio là một tenant.** Album, ảnh, thương hiệu, thành viên và gói dịch vụ đều thuộc về một studio; màn quản trị chỉ đọc dữ liệu của studio đang đăng nhập.
 - **Đăng ký studio** tại `/signup`: tên studio, địa chỉ studio (slug), tài khoản chủ studio. Studio mới bắt đầu ở gói Miễn phí.
 - **Vai trò:** *Chủ studio* quản lý thương hiệu, thành viên, gói dịch vụ; *Nhân viên* quản lý album, ảnh và chia sẻ. Một tài khoản có thể thuộc nhiều studio và chuyển studio ở khối tên studio trên sidebar.
-- **Gói dịch vụ** (`src/lib/plans.ts`): Miễn phí (5 GB, 10 album, 2 thành viên), Pro (199.000đ/tháng, 200 GB, 5 thành viên), Business (599.000đ/tháng, 1 TB, 20 thành viên). Server chặn tạo album, thêm thành viên và tải ảnh khi vượt giới hạn. Chưa tích hợp thanh toán: đổi gói có hiệu lực ngay.
+- **Gói dịch vụ & chuyển khoản VietQR** (`src/lib/plans.ts`, `src/lib/billing.ts`): Miễn phí (5 GB, 10 album, 2 thành viên), Pro (199.000đ/tháng, 200 GB, 5 thành viên), Business (599.000đ/tháng, 1 TB, 20 thành viên). Server chặn tạo album, thêm thành viên và tải ảnh khi vượt giới hạn. Đổi sang hoặc gia hạn gói trả phí hiện mã VietQR điền sẵn số tiền + mã giao dịch; studio tải ảnh xác nhận chuyển khoản (trạng thái *Đợi quản trị viên xác nhận*). Gói trả phí tính theo tháng dương lịch (hết hạn đầu tháng tiếp theo): khi hết hạn, studio bị chặn tạo/tải/sửa album (vẫn vào được trang Gói dịch vụ để nộp tiền), còn album đã giao cho khách vẫn xem bình thường.
 - **Link khách** có dạng `/s/:studio/:album`. Slug album chỉ cần duy nhất trong studio. Gallery dùng logo, màu và khẩu hiệu của studio sở hữu album, chân trang ghi "Vận hành bởi PICORA". Link cũ `/gallery/:album` tự chuyển sang link mới.
-- **Quản trị nền tảng** tại `/platform`: tạo studio mới (chọn gói, gán chủ studio bằng tài khoản mới hoặc email đã có), danh sách studio, dung lượng, đổi gói, tạm khóa / mở lại studio. Studio bị tạm khóa không đăng nhập được và album tạm ẩn với khách.
+- **Quản trị nền tảng** tại `/platform`: tạo studio mới, theo dõi danh sách studio và hạn gói, cấu hình tài khoản ngân hàng nhận tiền (VietQR), duyệt hoặc từ chối ảnh xác nhận chuyển khoản của studio, tạm khóa / mở lại studio. Studio bị tạm khóa không đăng nhập được và album tạm ẩn với khách.
 
 ## Chạy dự án
 

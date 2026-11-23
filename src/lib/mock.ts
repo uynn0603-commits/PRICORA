@@ -1,4 +1,5 @@
 import { cameras, events, fashion, graduation, men, moody, outdoor, rotate, wedding, weddingExtra, women } from "./library";
+import { startOfNextMonthVN } from "./billing";
 import { toISODate } from "./format";
 import type { Album, AlbumStatus, Database, Photo, StudioSettings } from "./types";
 
@@ -185,6 +186,7 @@ export function createSeed(): Database {
         slug: "minh-khoa-studio",
         name: "Minh Khoa Studio",
         planId: "free",
+        planExpiresAt: null,
         status: "active",
         createdAt: monthDate(-8, 2).toISOString(),
         settings: studioSettings(),
@@ -194,6 +196,7 @@ export function createSeed(): Database {
         slug: "lumiere-wedding",
         name: "Lumière Wedding",
         planId: "pro",
+        planExpiresAt: startOfNextMonthVN().toISOString(),
         status: "active",
         createdAt: monthDate(-3, 10).toISOString(),
         settings: studioSettings({ primaryColor: "#B4685A", secondaryColor: "#D9A441", slogan: "Lưu giữ ngày trọng đại." }),

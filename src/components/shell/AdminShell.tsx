@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { clearSession, currentStudio, getSession, studiosForUser, switchStudio } from "@/lib/store";
+import { Icon } from "@/components/ui/Icon";
+import { formatVNDate, isPlanExpired } from "@/lib/billing";
+import { clearSession, currentStudio, getPendingPayment, getPlan, getSession, isOwner, studiosForUser, switchStudio } from "@/lib/store";
 import { openMenu, toast, type MenuItem } from "@/lib/overlay";
 import { useStore } from "@/lib/use-store";
 import { Header } from "./Header";
@@ -36,6 +39,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }, [menuOpen]);
 
   if (blocked || !session) return null;
+
+  const plan = getPlan();
+  const planExpired = isPlanExpired(studio);
+  const pendingPayment = getPendingPayment();
+  const owner = isOwner();
 
   const logout = () => {
     clearSession();
@@ -77,6 +85,34 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <Sidebar path={path} open={menuOpen} onClose={() => setMenuOpen(false)} onSwitchStudio={onSwitchStudio} onLogout={logout} />
       <div className="lg:pl-[250px]">
         <Header path={path} onOpenMenu={() => setMenuOpen(true)} onAvatar={onAvatar} />
+        {planExpired ? (
+          <div className="border-b border-rose-200 bg-rose-50 px-4 py-3 md:px-6 xl:px-8">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-rose-900">
+              <div className="flex items-start gap-2.5">
+                <Icon name={pendingPayment ? "clock" : "circle-alert"} className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+                <p>
+                  <span className="font-semibold">
+                    Gói {plan.name} đã hết hạn từ {formatVNDate(studio?.planExpiresAt)}.
+                  </span>{" "}
+                  {pendingPayment
+                    ? "Yêu cầu gia hạn đang đợi quản trị viên xác nhận. Các thao tác tạo và sửa album đang tạm khóa; album đã giao cho khách vẫn xem bình thường."
+                    : "Các thao tác tạo và sửa album đang tạm khóa cho tới khi gia hạn được duyệt; album đã giao cho khách vẫn xem bình thường."}
+                </p>
+              </div>
+              {owner ? (
+                <Link
+                  href="/admin/settings?tab=plan"
+                  className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-rose-600 px-3.5 text-xs font-semibold text-white hover:bg-rose-700"
+                >
+                  <Icon name="qr-code" className="h-3.5 w-3.5" />
+                  {pendingPayment ? "Xem trạng thái duyệt" : "Gia hạn ngay"}
+                </Link>
+              ) : (
+                <span className="text-xs font-medium text-rose-700">Liên hệ chủ studio để gia hạn</span>
+              )}
+            </div>
+          </div>
+        ) : null}
         <main className="px-4 py-6 md:px-6 xl:px-8 xl:py-8">{children}</main>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { api, ApiError, errorMessage, uploadFile, withRetry } from "./api";
+import { daysUntilPlanExpiry, formatVNDate, isPlanExpired, isPlanExpiringSoon } from "./billing";
 import { studioSettings } from "./mock";
 import { getPlanById } from "./plans";
 import { isTemplateId } from "./catalog";
@@ -13,8 +14,12 @@ import type {
   FormOutcome,
   Membership,
   Outcome,
+  PaymentKind,
+  PaymentRequest,
   Photo,
   Plan,
+  PlatformBank,
+  PlatformPaymentRequest,
   Role,
   Session,
   Studio,
@@ -71,6 +76,7 @@ interface Bootstrap {
   studios?: Array<{ studio: Studio; role: Role }>;
   members?: Member[];
   albums?: Album[];
+  pendingPayment?: PaymentRequest | null;
 }
 
 interface State {
@@ -79,9 +85,10 @@ interface State {
   studios: Array<{ studio: Studio; role: Role }>;
   members: Member[];
   albums: Album[];
+  pendingPayment: PaymentRequest | null;
 }
 
-const EMPTY: State = { session: null, user: null, studios: [], members: [], albums: [] };
+const EMPTY: State = { session: null, user: null, studios: [], members: [], albums: [], pendingPayment: null };
 let state: State = EMPTY;
 
 export async function hydrate(): Promise<void> {
@@ -94,10 +101,13 @@ export async function hydrate(): Promise<void> {
           studios: data.studios || [],
           members: data.members || [],
           albums: data.albums || [],
+          pendingPayment: data.pendingPayment || null,
         }
       : EMPTY;
+    studioBilling = null;
   } catch (error) {
     state = EMPTY;
+    studioBilling = null;
     toast(errorMessage(error, "Không tải được dữ liệu từ máy chủ."), "error");
   }
   emit();
@@ -300,6 +310,83 @@ export async function changePlan(planId: string): Promise<Outcome<{ plan: Plan }
     const { studio } = await api<{ studio: Studio }>("/studio/plan", { method: "PUT", body: { planId } });
     replaceStudio(studio);
     return { ok: true, plan: getPlanById(studio.planId) };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
+export function getPendingPayment(): PaymentRequest | null {
+  return state.pendingPayment;
+}
+
+let studioBilling: { studioId: string; bank: PlatformBank; requests: PaymentRequest[] } | null = null;
+
+export function getStudioBilling(): { loaded: boolean; bank: PlatformBank | null; requests: PaymentRequest[] } {
+  const id = currentStudioId();
+  if (!studioBilling || studioBilling.studioId !== id) return { loaded: false, bank: null, requests: [] };
+  return { loaded: true, bank: studioBilling.bank, requests: studioBilling.requests };
+}
+
+export async function loadStudioBilling(): Promise<void> {
+  const id = currentStudioId();
+  if (!id) return;
+  try {
+    const data = await api<{ bank: PlatformBank; requests: PaymentRequest[] }>("/studio/billing");
+    studioBilling = { studioId: id, bank: data.bank, requests: data.requests };
+    state.pendingPayment = data.requests.find((item) => item.status === "pending") || null;
+  } catch (error) {
+    toast(errorMessage(error, "Không tải được thông tin thanh toán."), "error");
+  }
+  emit();
+}
+
+export async function submitPaymentRequest(input: {
+  file: File;
+  targetPlanId: string;
+  kind: PaymentKind;
+  transferCode: string;
+  note: string;
+}): Promise<Outcome<{ request: PaymentRequest }>> {
+  const ext = input.file.name.split(".").pop()?.toLowerCase() || "";
+  if (!ACCEPTED_EXT.has(ext) || (input.file.type && !ACCEPTED_TYPES.has(input.file.type))) {
+    return { ok: false, error: "Chỉ chấp nhận ảnh xác nhận JPG, PNG hoặc WEBP." };
+  }
+  if (input.file.size > 10 * 1024 * 1024) return { ok: false, error: "Ảnh xác nhận vượt quá 10 MB." };
+  try {
+    const intent = await api<{ paymentId: string; key: string; uploadUrl: string }>("/studio/payments/upload", {
+      body: { name: input.file.name, type: input.file.type, size: input.file.size },
+    });
+    await withRetry(() => uploadFile(intent.uploadUrl, input.file));
+    const { request } = await api<{ request: PaymentRequest }>("/studio/payments", {
+      body: {
+        paymentId: intent.paymentId,
+        receiptKey: intent.key,
+        targetPlanId: input.targetPlanId,
+        kind: input.kind,
+        transferCode: input.transferCode,
+        note: input.note,
+      },
+    });
+    state.pendingPayment = request;
+    if (studioBilling && studioBilling.studioId === currentStudioId()) {
+      studioBilling = { ...studioBilling, requests: [request, ...studioBilling.requests] };
+    }
+    emit();
+    return { ok: true, request };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error, "Chưa gửi được ảnh xác nhận. Vui lòng thử lại.") };
+  }
+}
+
+export async function cancelPaymentRequest(id: string): Promise<Outcome> {
+  try {
+    await api(`/studio/payments/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (state.pendingPayment?.id === id) state.pendingPayment = null;
+    if (studioBilling) {
+      studioBilling = { ...studioBilling, requests: studioBilling.requests.filter((item) => item.id !== id) };
+    }
+    emit();
+    return { ok: true };
   } catch (error) {
     return { ok: false, error: errorMessage(error) };
   }
@@ -960,7 +1047,26 @@ export interface Notification {
 
 export function getNotifications(): Notification[] {
   const studioId = currentStudioId();
+  const studio = currentStudio();
   const items: Notification[] = [];
+  if (studio && isPlanExpired(studio)) {
+    items.push({
+      id: `${studioId}:plan-expired:${studio.planExpiresAt}`,
+      title: state.pendingPayment
+        ? `Gói ${getPlan().name} đã hết hạn — đang chờ duyệt gia hạn`
+        : `Gói ${getPlan().name} đã hết hạn từ ${formatVNDate(studio.planExpiresAt)}`,
+      meta: "Gói dịch vụ · Cần gia hạn",
+      href: "/admin/settings?tab=plan",
+    });
+  } else if (studio && isPlanExpiringSoon(studio) && !state.pendingPayment) {
+    const days = daysUntilPlanExpiry(studio);
+    items.push({
+      id: `${studioId}:plan-expiring:${studio.planExpiresAt}`,
+      title: `Gói ${getPlan().name} sắp hết hạn (${days === 1 ? "còn 1 ngày" : `còn ${days} ngày`}, đến ${formatVNDate(studio.planExpiresAt)})`,
+      meta: "Gói dịch vụ · Đóng phí đầu tháng",
+      href: "/admin/settings?tab=plan",
+    });
+  }
   getExpiring().forEach((item) => {
     items.push({
       id: `${studioId}:exp-${item.album.id}`,
@@ -1036,12 +1142,20 @@ export interface StudioRow {
 }
 
 let platformRows: Array<Omit<StudioRow, "plan">> | null = null;
+let platformBank: PlatformBank | null = null;
+let platformPayments: PlatformPaymentRequest[] = [];
 
 export async function loadPlatform(): Promise<void> {
   try {
-    platformRows = (await api<{ studios: Array<Omit<StudioRow, "plan">> }>("/platform/studios")).studios;
+    const [studiosRes, billingRes] = await Promise.all([
+      api<{ studios: Array<Omit<StudioRow, "plan">> }>("/platform/studios"),
+      api<{ bank: PlatformBank; requests: PlatformPaymentRequest[] }>("/platform/billing"),
+    ]);
+    platformRows = studiosRes.studios;
+    platformBank = billingRes.bank;
+    platformPayments = billingRes.requests;
   } catch (error) {
-    toast(errorMessage(error, "Không tải được danh sách studio."), "error");
+    toast(errorMessage(error, "Không tải được dữ liệu nền tảng."), "error");
   }
   emit();
 }
@@ -1052,6 +1166,52 @@ export function listStudios(): StudioRow[] {
 
 export function platformLoaded(): boolean {
   return platformRows != null;
+}
+
+export function getPlatformBankConfig(): PlatformBank {
+  return platformBank || { bankId: "", bankAccount: "", accountName: "", transferPrefix: "PICORA" };
+}
+
+export function listPlatformPayments(): PlatformPaymentRequest[] {
+  return platformPayments;
+}
+
+export async function savePlatformBank(input: PlatformBank): Promise<Outcome<{ bank: PlatformBank }>> {
+  try {
+    const { bank } = await api<{ bank: PlatformBank }>("/platform/bank", { method: "PUT", body: input });
+    platformBank = bank;
+    emit();
+    return { ok: true, bank };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
+export async function approvePaymentRequest(id: string, note = ""): Promise<{ ok: boolean; warning?: string; error?: string }> {
+  try {
+    const result = await api<{ studio: Studio; request: PlatformPaymentRequest; warning: string }>(
+      `/platform/payments/${encodeURIComponent(id)}/approve`,
+      { body: { note } },
+    );
+    platformPayments = platformPayments.map((item) => (item.id === id ? result.request : item));
+    platformRows = (platformRows || []).map((row) => (row.studio.id === result.studio.id ? { ...row, studio: result.studio } : row));
+    if (state.studios.some((item) => item.studio.id === result.studio.id)) replaceStudio(result.studio);
+    emit();
+    return { ok: true, warning: result.warning || undefined };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
+export async function rejectPaymentRequest(id: string, note: string): Promise<Outcome> {
+  try {
+    const result = await api<{ request: PlatformPaymentRequest }>(`/platform/payments/${encodeURIComponent(id)}/reject`, { body: { note } });
+    platformPayments = platformPayments.map((item) => (item.id === id ? result.request : item));
+    emit();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
 }
 
 export async function createStudio(input: {
@@ -1072,7 +1232,7 @@ export async function createStudio(input: {
   }
 }
 
-async function patchPlatformStudio(studioId: string, body: Record<string, string>): Promise<{ ok: boolean; warning?: string; error?: string }> {
+async function patchPlatformStudio(studioId: string, body: Record<string, string | null>): Promise<{ ok: boolean; warning?: string; error?: string }> {
   try {
     const result = await api<{ studio: Studio; warning: string }>(`/platform/studios/${encodeURIComponent(studioId)}`, { method: "PATCH", body });
     platformRows = (platformRows || []).map((row) => (row.studio.id === studioId ? { ...row, studio: result.studio } : row));
@@ -1091,6 +1251,10 @@ export function setStudioStatus(studioId: string, status: StudioStatus) {
 // The platform may move a studio to any plan; usage over the new limit only blocks new uploads.
 export function setStudioPlan(studioId: string, planId: string) {
   return patchPlatformStudio(studioId, { planId });
+}
+
+export function setStudioExpiry(studioId: string, planExpiresAt: string | null) {
+  return patchPlatformStudio(studioId, { planExpiresAt });
 }
 
 export async function resetDemo(): Promise<Outcome> {

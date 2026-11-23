@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { isTemplateId, suggestTemplateId } from "@/lib/catalog";
 import { getPlanById } from "@/lib/plans";
-import { requireStudio, studioOf, type AppEnv } from "../auth";
+import { requireActivePlan, requireStudio, studioOf, type AppEnv } from "../auth";
 import { newId } from "../crypto";
 import { asStudio, type Tx } from "../db";
 import { EDIT_REPLY_MAX, type PhotoEdit } from "@/lib/types";
@@ -14,6 +14,15 @@ export const albumRoutes = new Hono<AppEnv>();
 albumRoutes.use("/albums", requireStudio);
 albumRoutes.use("/albums/*", requireStudio);
 albumRoutes.use("/uploads/*", requireStudio);
+
+// Expired paid studios stay read-only until renewal is approved; public galleries stay open.
+const blockIfExpired = async (c: Parameters<typeof requireActivePlan>[0], next: Parameters<typeof requireActivePlan>[1]) => {
+  if (c.req.method === "GET") return next();
+  return requireActivePlan(c, next);
+};
+albumRoutes.use("/albums", blockIfExpired);
+albumRoutes.use("/albums/*", blockIfExpired);
+albumRoutes.use("/uploads/*", blockIfExpired);
 
 const STATUSES = new Set(["published", "draft", "hidden"]);
 const IMAGE_EXT = new Set(["jpg", "jpeg", "png", "webp"]);

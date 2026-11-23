@@ -1,5 +1,21 @@
 import { studioSettings } from "@/lib/mock";
-import type { Album, AlbumStatus, Membership, Photo, PhotoEdit, Role, Studio, StudioSettings, StudioStatus, User } from "@/lib/types";
+import type {
+  Album,
+  AlbumStatus,
+  Membership,
+  PaymentKind,
+  PaymentRequest,
+  PaymentStatus,
+  Photo,
+  PhotoEdit,
+  PlatformBank,
+  PlatformPaymentRequest,
+  Role,
+  Studio,
+  StudioSettings,
+  StudioStatus,
+  User,
+} from "@/lib/types";
 import type { Tx } from "./db";
 import { publicUrl } from "./storage";
 
@@ -10,9 +26,43 @@ export interface StudioRow {
   slug: string;
   name: string;
   planId: string;
+  planExpiresAt: Date | null;
   status: StudioStatus;
   settings: Partial<StudioSettings> | null;
   createdAt: Date;
+}
+
+export interface PlatformBankRow {
+  bankId: string;
+  bankAccount: string;
+  accountName: string;
+  transferPrefix: string;
+  updatedAt: Date;
+}
+
+export interface PaymentRequestRow {
+  id: string;
+  studioId: string;
+  kind: PaymentKind;
+  targetPlanId: string;
+  amount: number;
+  transferCode: string;
+  receiptKey: string;
+  note: string;
+  status: PaymentStatus;
+  adminNote: string;
+  reviewedAt: Date | null;
+  appliedExpiresAt: Date | null;
+  createdAt: Date;
+}
+
+export interface PlatformPaymentRow extends PaymentRequestRow {
+  studioName: string;
+  studioSlug: string;
+  currentPlanId: string;
+  currentPlanExpiresAt: Date | null;
+  submitterName: string | null;
+  submitterEmail: string | null;
 }
 
 export interface UserRow {
@@ -79,9 +129,50 @@ export function toStudio(row: StudioRow): Studio {
     slug: row.slug,
     name: row.name,
     planId: row.planId,
+    planExpiresAt: row.planExpiresAt ? row.planExpiresAt.toISOString() : null,
     status: row.status,
     createdAt: row.createdAt.toISOString(),
     settings: studioSettings(row.settings || {}),
+  };
+}
+
+export function toBank(row?: PlatformBankRow | null): PlatformBank {
+  return {
+    bankId: row?.bankId || "",
+    bankAccount: row?.bankAccount || "",
+    accountName: row?.accountName || "",
+    transferPrefix: row?.transferPrefix || "PICORA",
+    updatedAt: row?.updatedAt ? row.updatedAt.toISOString() : undefined,
+  };
+}
+
+export function toPaymentRequest(row: PaymentRequestRow): PaymentRequest {
+  return {
+    id: row.id,
+    studioId: row.studioId,
+    kind: row.kind,
+    targetPlanId: row.targetPlanId,
+    amount: Number(row.amount),
+    transferCode: row.transferCode,
+    receiptUrl: publicUrl(row.receiptKey),
+    note: row.note,
+    status: row.status,
+    adminNote: row.adminNote,
+    reviewedAt: row.reviewedAt ? row.reviewedAt.toISOString() : null,
+    appliedExpiresAt: row.appliedExpiresAt ? row.appliedExpiresAt.toISOString() : null,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+export function toPlatformPaymentRequest(row: PlatformPaymentRow): PlatformPaymentRequest {
+  return {
+    ...toPaymentRequest(row),
+    studioName: row.studioName,
+    studioSlug: row.studioSlug,
+    currentPlanId: row.currentPlanId,
+    currentPlanExpiresAt: row.currentPlanExpiresAt ? row.currentPlanExpiresAt.toISOString() : null,
+    submitterName: row.submitterName || "",
+    submitterEmail: row.submitterEmail || "",
   };
 }
 
@@ -149,7 +240,33 @@ function toAlbum(row: AlbumRow, photos: Photo[]): Album {
 
 /* ---------- Queries ---------- */
 
-export const STUDIO_COLUMNS = "id, slug, name, plan_id, status, settings, created_at";
+export const STUDIO_COLUMNS = "id, slug, name, plan_id, plan_expires_at, status, settings, created_at";
+
+export async function getPlatformBank(tx: Tx): Promise<PlatformBank> {
+  const [row] = await tx<PlatformBankRow[]>`
+    select bank_id, bank_account, account_name, transfer_prefix, updated_at
+    from platform_settings where id = 'default'`;
+  return toBank(row);
+}
+
+export const PAYMENT_COLUMNS =
+  "id, studio_id, kind, target_plan_id, amount, transfer_code, receipt_key, note, status, admin_note, reviewed_at, applied_expires_at, created_at";
+
+export async function listStudioPayments(tx: Tx, studioId: string): Promise<PaymentRequest[]> {
+  const rows = await tx.unsafe<PaymentRequestRow[]>(
+    `select ${PAYMENT_COLUMNS} from payment_requests where studio_id = $1 order by created_at desc limit 50`,
+    [studioId],
+  );
+  return rows.map(toPaymentRequest);
+}
+
+export async function getPendingStudioPayment(tx: Tx, studioId: string): Promise<PaymentRequest | null> {
+  const [row] = await tx.unsafe<PaymentRequestRow[]>(
+    `select ${PAYMENT_COLUMNS} from payment_requests where studio_id = $1 and status = 'pending' order by created_at desc limit 1`,
+    [studioId],
+  );
+  return row ? toPaymentRequest(row) : null;
+}
 
 export async function findStudio(tx: Tx, id: string): Promise<StudioRow | null> {
   const [row] = await tx.unsafe<StudioRow[]>(`select ${STUDIO_COLUMNS} from studios where id = $1`, [id]);
