@@ -22,7 +22,7 @@ authRoutes.post("/auth/login", async (c) => {
       select id, password_hash, platform_admin from users where lower(email) = lower(${email})`;
     if (!(await verifyPassword(password, user?.passwordHash))) return c.json({ error: "Email hoặc mật khẩu không đúng." }, 401);
 
-    // Land in the first active studio, else the platform console.
+    // Platform admins land in the console; everyone else in their first active studio.
     const studios = await tx<Array<{ id: string; name: string; status: string }>>`
       select s.id, s.name, s.status from memberships m join studios s on s.id = m.studio_id
       where m.user_id = ${user.id} order by m.created_at, s.created_at`;
@@ -31,7 +31,7 @@ authRoutes.post("/auth/login", async (c) => {
       if (studios.length) return c.json({ error: `${studios[0].name} đang bị tạm khóa. Vui lòng liên hệ PICORA.` }, 403);
       return c.json({ error: "Tài khoản này chưa thuộc studio nào." }, 403);
     }
-    const studioId = active?.id || null;
+    const studioId = user.platformAdmin ? null : active?.id || null;
     await startSession(c, tx, user.id, studioId, remember);
     return c.json({ studioId });
   });
@@ -77,6 +77,11 @@ authRoutes.post("/session/studio", requireUser, async (c) => {
   const auth = c.get("auth")!;
   const { studioId } = await c.req.json().catch(() => ({}));
   return asSystem(async (tx) => {
+    // A platform admin may drop back to the console, which has no studio context.
+    if (!studioId && auth.user.platformAdmin) {
+      await tx`update sessions set studio_id = null where token_hash = ${auth.tokenHash}`;
+      return c.json({ studioId: null });
+    }
     const [target] = await tx<Array<{ name: string; status: string }>>`
       select s.name, s.status from memberships m join studios s on s.id = m.studio_id
       where m.user_id = ${auth.user.id} and m.studio_id = ${String(studioId || "")}`;

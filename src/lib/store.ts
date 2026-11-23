@@ -162,6 +162,16 @@ export function studiosForUser(_userId?: string): Array<{ studio: Studio; role: 
   return state.studios;
 }
 
+export async function enterPlatform(): Promise<Outcome> {
+  try {
+    await api("/session/studio", { body: { studioId: null } });
+    await hydrate();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
 export async function switchStudio(studioId: string): Promise<Outcome> {
   try {
     await api("/session/studio", { body: { studioId } });

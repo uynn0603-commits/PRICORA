@@ -8,7 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import { LogoLockup, StudioMark } from "@/components/ui/Logo";
 import { formatVNDate, isBankConfigured, isPlanExpired } from "@/lib/billing";
 import { cn, formatBytes, formatDate, slugify } from "@/lib/format";
-import { closeModal, confirmDialog, openModal, toast } from "@/lib/overlay";
+import { closeModal, confirmDialog, openMenu, openModal, toast } from "@/lib/overlay";
 import { formatPrice, PLANS } from "@/lib/plans";
 import {
   clearSession,
@@ -21,6 +21,8 @@ import {
   platformLoaded,
   setStudioPlan,
   setStudioStatus,
+  studiosForUser,
+  switchStudio,
 } from "@/lib/store";
 import type { StudioStatus } from "@/lib/types";
 import { ui } from "@/lib/ui";
@@ -293,6 +295,31 @@ export default function PlatformPage() {
             <span className="hidden rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-white sm:inline">Quản trị nền tảng</span>
           </div>
           <div className="flex items-center gap-3">
+            {studiosForUser(session.user.id).some((item) => item.studio.status === "active") && (
+              <button
+                type="button"
+                onClick={(event) =>
+                  openMenu(
+                    event.currentTarget,
+                    studiosForUser(session.user.id)
+                      .filter((item) => item.studio.status === "active")
+                      .map((item) => ({
+                        label: item.studio.name,
+                        icon: "building-2",
+                        onClick: () => {
+                          void switchStudio(item.studio.id).then((result) => {
+                            if (!result.ok) return toast(result.error, "error");
+                            router.push("/admin");
+                          });
+                        },
+                      })),
+                  )
+                }
+                className={ui.secondary}
+              >
+                <Icon name="building-2" className="h-4 w-4" /> Vào studio
+              </button>
+            )}
             <span className="hidden text-right sm:block">
               <span className="block text-sm font-semibold">{session.name}</span>
               <span className="block text-xs text-mist">{session.email}</span>
