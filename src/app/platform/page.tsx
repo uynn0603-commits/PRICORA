@@ -31,12 +31,14 @@ const STATUS: Record<StudioStatus, { label: string; className: string }> = {
   suspended: { label: "Tạm khóa", className: "bg-rose-50 text-rose-700" },
 };
 
-function Stat({ label, value, icon }: { label: string; value: ReactNode; icon: string }) {
+function Stat({ label, value, icon, tone = "bg-violet-100 text-violet-600" }: { label: string; value: ReactNode; icon: string; tone?: string }) {
   return (
     <article className={`${ui.card} p-5`}>
-      <div className="flex items-center justify-between text-mist">
-        <span className="text-sm">{label}</span>
-        <Icon name={icon} className="h-4 w-4" />
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-mist">{label}</span>
+        <span className={`grid h-9 w-9 place-items-center rounded-xl ${tone}`}>
+          <Icon name={icon} className="h-4 w-4" />
+        </span>
       </div>
       <p className="mt-3 text-2xl font-semibold tracking-tight">{value}</p>
     </article>
@@ -315,6 +317,7 @@ export default function PlatformPage() {
           <Stat
             label="Studio"
             icon="building-2"
+            tone="bg-violet-100 text-violet-600"
             value={
               <>
                 {rows.length} <span className="text-sm font-normal text-mist">· {active.length} hoạt động</span>
@@ -325,6 +328,7 @@ export default function PlatformPage() {
             <Stat
               label="Thanh toán chờ duyệt"
               icon="receipt"
+              tone="bg-amber-100 text-amber-600"
               value={
                 <span className={pendingCount > 0 ? "text-amber-600" : ""}>
                   {pendingCount.toLocaleString("vi-VN")}
@@ -336,13 +340,14 @@ export default function PlatformPage() {
           <Stat
             label="Album & dung lượng"
             icon="hard-drive"
+            tone="bg-sky-100 text-sky-600"
             value={
               <>
                 {formatBytes(storage)} <span className="text-sm font-normal text-mist">· {albums.toLocaleString("vi-VN")} album</span>
               </>
             }
           />
-          <Stat label="Doanh thu tháng" icon="credit-card" value={formatPrice(revenue)} />
+          <Stat label="Doanh thu tháng" icon="credit-card" tone="bg-emerald-100 text-emerald-600" value={formatPrice(revenue)} />
         </section>
 
         <div className="mt-6 flex gap-5 overflow-x-auto border-b border-line">

@@ -33,6 +33,7 @@ export default function DashboardPage() {
       note: `${overview.current.albums} album tạo trong tháng này`,
       icon: "images",
       href: "/admin/albums",
+      tone: "bg-violet-100 text-violet-600",
     },
     {
       label: "Tổng số ảnh",
@@ -40,6 +41,7 @@ export default function DashboardPage() {
       note: `${overview.current.photos.toLocaleString("vi-VN")} ảnh thêm trong tháng này`,
       icon: "image",
       href: "/admin/albums",
+      tone: "bg-sky-100 text-sky-600",
     },
     {
       label: "Dung lượng đã dùng",
@@ -47,6 +49,7 @@ export default function DashboardPage() {
       note: `Còn trống ${formatBytes(overview.storage.available)}`,
       icon: "hard-drive",
       href: "/admin/storage",
+      tone: "bg-amber-100 text-amber-600",
     },
     {
       label: "Album đã xuất bản",
@@ -54,6 +57,7 @@ export default function DashboardPage() {
       note: "Khách hàng đang xem được",
       icon: "circle-check",
       href: "/admin/albums?status=published",
+      tone: "bg-emerald-100 text-emerald-600",
     },
   ];
 
@@ -73,7 +77,7 @@ export default function DashboardPage() {
           <Link key={card.label} href={card.href} className={`${ui.card} block p-5 transition hover:border-primary/30`}>
             <span className="flex items-center justify-between gap-3">
               <span className="text-[13px] font-medium text-mist">{card.label}</span>
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+              <span className={`grid h-9 w-9 place-items-center rounded-xl ${card.tone}`}>
                 <Icon name={card.icon} className="h-4 w-4" />
               </span>
             </span>

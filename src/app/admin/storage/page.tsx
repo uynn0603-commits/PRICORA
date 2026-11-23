@@ -35,13 +35,18 @@ export default function StoragePage() {
       )}
       <section className="grid gap-4 md:grid-cols-3">
         {[
-          [`Dung lượng gói ${plan.name}`, formatBytes(stats.quota)],
-          ["Đã sử dụng", formatBytes(stats.used)],
-          ["Còn trống", formatBytes(stats.available)],
-        ].map(([label, value]) => (
+          [`Dung lượng gói ${plan.name}`, formatBytes(stats.quota), "bg-violet-100 text-violet-600", "hard-drive"],
+          ["Đã sử dụng", formatBytes(stats.used), "bg-amber-100 text-amber-600", "image"],
+          ["Còn trống", formatBytes(stats.available), "bg-emerald-100 text-emerald-600", "circle-check"],
+        ].map(([label, value, tone, icon]) => (
           <article key={label} className={`${ui.card} p-5`}>
-            <p className="text-[13px] font-medium text-mist">{label}</p>
-            <p className="mt-3 text-[28px] font-semibold tracking-tight">{value}</p>
+            <span className="flex items-center justify-between gap-3">
+              <span className="text-[13px] font-medium text-mist">{label}</span>
+              <span className={`grid h-9 w-9 place-items-center rounded-xl ${tone}`}>
+                <Icon name={icon} className="h-4 w-4" />
+              </span>
+            </span>
+            <p className="mt-4 text-[28px] font-semibold tracking-tight">{value}</p>
           </article>
         ))}
       </section>
