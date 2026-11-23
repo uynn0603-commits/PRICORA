@@ -1,20 +1,37 @@
+
 {
   "name": "picora",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "next dev --port 5173",
+    "build": "next build",
+    "start": "next start --port 5173",
+    "typecheck": "tsc --noEmit",
+    "db:up": "docker compose up -d",
+    "db:migrate": "tsx --env-file=.env.local scripts/migrate.ts",
+    "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
+    "db:setup": "npm run db:migrate && npm run db:seed",
+    "storage:cors": "tsx scripts/storage-cors.ts"
   },
   "dependencies": {
+    "aws4fetch": "^1.0.20",
+    "hono": "^4.13.19",
     "jszip": "^3.10.2",
-    "lucide": "^1.75.0"
+    "lucide-react": "^1.76.0",
+    "next": "^16.4.6",
+    "postgres": "^4.1.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.5",
+    "@tailwindcss/postcss": "^4.3.5",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.2.0",
     "tailwindcss": "^4.3.5",
-    "vite": "^8.3.8"
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3"
   }
 }
