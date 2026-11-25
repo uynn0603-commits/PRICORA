@@ -42,7 +42,7 @@ export function CoverImage({
         alt={alt}
         fetchPriority="high"
         decoding="async"
-        className={`${className} object-cover`}
+        className={`${className} object-cover object-[center_20%]`}
       />
     </picture>
   );
