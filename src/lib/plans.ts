@@ -11,6 +11,7 @@ export const PLANS: Plan[] = [
     storage: 5 * GB,
     albums: 10,
     members: 2,
+    invitations: 1,
     description: "Cho nhiếp ảnh gia mới bắt đầu giao ảnh online.",
   },
   {
@@ -20,6 +21,7 @@ export const PLANS: Plan[] = [
     storage: 200 * GB,
     albums: null,
     members: 5,
+    invitations: null,
     description: "Cho studio giao album đều đặn mỗi tuần.",
   },
   {
@@ -29,6 +31,7 @@ export const PLANS: Plan[] = [
     storage: 1024 * GB,
     albums: null,
     members: 20,
+    invitations: null,
     description: "Cho studio nhiều chi nhánh và đội ngũ lớn.",
   },
 ];

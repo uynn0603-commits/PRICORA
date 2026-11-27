@@ -105,9 +105,14 @@ export default function SharePage() {
         title="Chia sẻ album"
         description={album.name}
         actions={
-          <Link href={galleryPath(album)} className={ui.secondary}>
-            <Icon name="eye" className="h-4 w-4" /> Mở album
-          </Link>
+          <>
+            <Link href={`/admin/invitations/new?album=${album.id}`} className={ui.secondary}>
+              <Icon name="mail" className="h-4 w-4" /> Tạo thiệp
+            </Link>
+            <Link href={galleryPath(album)} className={ui.secondary}>
+              <Icon name="eye" className="h-4 w-4" /> Mở album
+            </Link>
+          </>
         }
       />
       {published ? (

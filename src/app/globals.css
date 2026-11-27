@@ -159,10 +159,232 @@ textarea {
   animation: rise-in 1s ease-out 0.35s both;
 }
 
+@keyframes invite-kenburns {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes invite-drift {
+  0% {
+    transform: translate3d(0, -12%, 0) rotate(0deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.75;
+  }
+  100% {
+    transform: translate3d(28px, 108%, 0) rotate(36deg);
+    opacity: 0;
+  }
+}
+
+@keyframes invite-day {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(154 123 79 / 45%);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgb(154 123 79 / 0%);
+  }
+}
+
+.invite-hero-photo {
+  animation: invite-kenburns 22s ease-in-out infinite alternate;
+}
+
+.invite-petal {
+  position: absolute;
+  top: -8%;
+  border-radius: 999px;
+  background: rgb(251 247 242 / 80%);
+  animation-name: invite-drift;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.invite-day {
+  animation: invite-day 2.6s ease-out infinite;
+}
+
+.gl-paper {
+  background-color: #f7f1e7;
+  background-image:
+    radial-gradient(circle at 18% 8%, rgb(185 154 98 / 10%), transparent 36%),
+    radial-gradient(circle at 88% 92%, rgb(232 207 199 / 55%), transparent 40%);
+}
+
+.gl-scene {
+  width: min(88vw, 380px);
+  perspective: 1400px;
+}
+
+.gl-envelope {
+  position: relative;
+  height: 236px;
+  filter: drop-shadow(0 22px 28px rgb(73 56 45 / 14%));
+}
+
+.gl-body {
+  position: absolute;
+  inset: 0;
+  background: #e5d3b6;
+  box-shadow: inset 0 0 0 1px rgb(185 154 98 / 40%);
+}
+
+.gl-letter {
+  position: absolute;
+  top: 42%;
+  right: 8%;
+  left: 8%;
+  z-index: 2;
+  display: grid;
+  height: 52%;
+  place-items: center;
+  overflow: hidden;
+  background: #fffdf9;
+  border: 1px solid rgb(185 154 98 / 35%);
+  transition: transform 1.15s cubic-bezier(0.22, 0.8, 0.3, 1) 0.28s;
+}
+
+.gl-flap {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 4;
+  height: 58%;
+  transform-origin: center top;
+  transform-style: preserve-3d;
+  transition: transform 1.05s cubic-bezier(0.45, 0.05, 0.2, 1);
+}
+
+.gl-flap-face {
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  backface-visibility: hidden;
+}
+
+.gl-flap-front {
+  background: linear-gradient(180deg, #f6ecdc, #e7d4b4);
+}
+
+.gl-flap-back {
+  background: linear-gradient(180deg, #d7bc86, #b99a62);
+  transform: rotateX(180deg);
+}
+
+.gl-pocket {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: linear-gradient(180deg, #f4eadc 0%, #efe4d2 46%, #e6d5bc 100%);
+  clip-path: polygon(0 40%, 50% 74%, 100% 40%, 100% 100%, 0 100%);
+}
+
+.gl-seal {
+  position: absolute;
+  top: 62%;
+  left: 50%;
+  z-index: 5;
+  display: grid;
+  width: 74px;
+  height: 74px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, #e4d0a4, #b99a62 46%, #8d7344);
+  color: #fff;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  box-shadow:
+    0 10px 18px rgb(73 56 45 / 18%),
+    inset 0 0 0 4px rgb(255 255 255 / 28%);
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  transition:
+    opacity 0.45s ease,
+    transform 0.6s ease;
+}
+
+.gl-seal:focus-visible {
+  outline: 2px solid #49382d;
+  outline-offset: 4px;
+}
+
+.gl-scene.is-opening .gl-flap {
+  z-index: 1;
+  transform: rotateX(180deg);
+  transition:
+    transform 1.05s cubic-bezier(0.45, 0.05, 0.2, 1),
+    z-index 0s linear 0.42s;
+}
+
+.gl-scene.is-opening .gl-letter {
+  z-index: 5;
+  transform: translateY(-155%);
+}
+
+.gl-scene.is-opening .gl-seal {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.7);
+  pointer-events: none;
+}
+
+.gl-scene.is-opening {
+  animation: gl-fade 0.55s ease 1.2s forwards;
+}
+
+@keyframes gl-fade {
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.gl-page {
+  animation: rise-in 0.9s ease both;
+}
+
+.invite-reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 0.8s ease,
+    transform 0.8s ease;
+}
+
+.invite-reveal.is-shown {
+  opacity: 1;
+  transform: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cinematic-in,
-  .rise-in {
+  .rise-in,
+  .invite-hero-photo,
+  .invite-petal,
+  .invite-day,
+  .gl-page,
+  .gl-scene.is-opening {
     animation: none;
+  }
+
+  .gl-flap,
+  .gl-letter,
+  .gl-seal {
+    transition: none;
+  }
+
+  .invite-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }
 

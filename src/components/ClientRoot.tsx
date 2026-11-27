@@ -16,7 +16,7 @@ export function ClientRoot({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void hydrate().then(() => {
-      if (!location.pathname.startsWith("/s/")) applyBrand(getSettings());
+      if (!location.pathname.startsWith("/s/") && !location.pathname.startsWith("/i/")) applyBrand(getSettings());
       setMounted(true);
     });
     const onError = (event: Event) => {
@@ -33,7 +33,7 @@ export function ClientRoot({ children }: { children: ReactNode }) {
   useEffect(() => {
     closeTransient();
     closeLightbox();
-    if (!pathname.startsWith("/s/")) applyBrand(getSettings());
+    if (!pathname.startsWith("/s/") && !pathname.startsWith("/i/")) applyBrand(getSettings());
     document.documentElement.classList.toggle("is-embedded", new URLSearchParams(location.search).get("embed") === "1");
   }, [pathname]);
 

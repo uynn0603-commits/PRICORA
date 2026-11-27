@@ -1,3 +1,5 @@
+import type { InvitationContent } from "@/lib/invitation-content";
+
 export type Role = "owner" | "staff";
 export type AlbumStatus = "published" | "draft" | "hidden";
 export type EffectiveStatus = AlbumStatus | "expired";
@@ -168,7 +170,37 @@ export interface Plan {
   storage: number;
   albums: number | null;
   members: number;
+  // How many invitations the plan may create. `null` means unlimited.
+  invitations: number | null;
   description: string;
+}
+
+export type InvitationStatus = "published" | "draft";
+
+export interface Invitation {
+  id: string;
+  studioId: string;
+  albumId: string;
+  slug: string;
+  status: InvitationStatus;
+  templateId: string;
+  groomName: string;
+  brideName: string;
+  groomParents: string;
+  brideParents: string;
+  weddingDate: string;
+  weddingTime: string;
+  venue: string;
+  address: string;
+  mapUrl: string;
+  message: string;
+  thankYou: string;
+  musicUrl: string;
+  photoIds: string[];
+  // Structured Traditional Wedding fields. Empty for the older templates.
+  content: InvitationContent;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Session {

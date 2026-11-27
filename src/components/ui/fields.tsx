@@ -59,10 +59,10 @@ type AreaProps = Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "id"> &
   error?: string;
 };
 
-export function TextArea({ id, label, hint, error, ...rest }: AreaProps) {
+export function TextArea({ id, label, hint, error, required, ...rest }: AreaProps) {
   return (
     <label className="block" htmlFor={id}>
-      <Label text={label} />
+      <Label text={label} required={required} />
       <textarea id={id} name={id} rows={4} className={cn(ui.input, "h-auto py-3", error && "border-rose-400")} {...rest} />
       <Hint text={hint} />
       <FieldError message={error} />

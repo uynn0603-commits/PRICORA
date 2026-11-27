@@ -10,6 +10,7 @@ import { LogoLockup, StudioMark } from "../ui/Logo";
 const ITEMS = [
   { href: "/admin", label: "Tổng quan", icon: "layout-dashboard", exact: true },
   { href: "/admin/albums", label: "Album", icon: "images" },
+  { href: "/admin/invitations", label: "Thiệp", icon: "mail" },
   { href: "/admin/storage", label: "Lưu trữ", icon: "hard-drive" },
   { href: "/admin/settings", label: "Cài đặt", icon: "settings" },
 ];

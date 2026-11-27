@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { loadAuth, type AppEnv } from "./auth";
 import { albumRoutes } from "./routes/albums";
+import { invitationRoutes } from "./routes/invitations";
 import { authRoutes } from "./routes/auth";
 import { mediaRoutes } from "./routes/media";
 import { platformRoutes } from "./routes/platform";
@@ -19,6 +20,7 @@ app.use(loadAuth);
 app.route("/", authRoutes);
 app.route("/", studioRoutes);
 app.route("/", albumRoutes);
+app.route("/", invitationRoutes);
 app.route("/", publicRoutes);
 app.route("/", platformRoutes);
 

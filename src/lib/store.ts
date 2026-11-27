@@ -14,6 +14,7 @@ import type {
   FormOutcome,
   Membership,
   Outcome,
+  Invitation,
   PaymentKind,
   PaymentRequest,
   Photo,
@@ -152,6 +153,7 @@ export async function login(email: string, password: string, remember = true): P
 
 export function clearSession() {
   state = EMPTY;
+  invitations = null;
   platformRows = null;
   galleries.clear();
   emit();
@@ -166,6 +168,7 @@ export async function enterPlatform(): Promise<Outcome> {
   try {
     await api("/session/studio", { body: { studioId: null } });
     await hydrate();
+    invitations = null;
     return { ok: true };
   } catch (error) {
     return { ok: false, error: errorMessage(error) };
@@ -176,6 +179,7 @@ export async function switchStudio(studioId: string): Promise<Outcome> {
   try {
     await api("/session/studio", { body: { studioId } });
     await hydrate();
+    invitations = null;
     applyBrand(currentStudio()?.settings);
     return { ok: true };
   } catch (error) {
@@ -572,6 +576,63 @@ export function galleryPath(album: Album): string {
 
 export function albumUrl(album: Album): string {
   return `${location.origin}${galleryPath(album)}`;
+}
+
+/* ---------- Invitations ---------- */
+
+let invitations: Invitation[] | null = null;
+
+export function invitationList(): Invitation[] {
+  return invitations || [];
+}
+
+export function invitationsLoaded(): boolean {
+  return invitations != null;
+}
+
+export function invitationPath(invitation: Pick<Invitation, "slug">): string {
+  const studio = currentStudio();
+  return `/i/${studio?.slug || "studio"}/${invitation.slug}`;
+}
+
+export function invitationUrl(invitation: Pick<Invitation, "slug">): string {
+  return `${location.origin}${invitationPath(invitation)}`;
+}
+
+export async function loadInvitations(): Promise<void> {
+  try {
+    const data = await api<{ invitations: Invitation[] }>("/invitations");
+    invitations = data.invitations;
+  } catch (error) {
+    invitations = [];
+    toast(errorMessage(error, "Không tải được danh sách thiệp."), "error");
+  }
+  emit();
+}
+
+export async function saveInvitation(id: string | null, input: Partial<Invitation>): Promise<Outcome<Invitation>> {
+  try {
+    const { invitation } = await api<{ invitation: Invitation }>(id ? `/invitations/${encodeURIComponent(id)}` : "/invitations", {
+      method: id ? "PUT" : "POST",
+      body: input,
+    });
+    invitations = [invitation, ...(invitations || []).filter((item) => item.id !== invitation.id)];
+    emit();
+    return { ok: true, ...invitation };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
+export async function deleteInvitation(id: string): Promise<Outcome> {
+  try {
+    await api(`/invitations/${encodeURIComponent(id)}`, { method: "DELETE", body: {} });
+    invitations = (invitations || []).filter((item) => item.id !== id);
+    emit();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
 }
 
 export function extendExpiration(id: string, days = 30): Album | null {
